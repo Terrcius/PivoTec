@@ -40,6 +40,16 @@ const App = () => {
   const [reconnectTimer, setReconnectTimer] = useState(0);
   const ws = useRef(null);
 
+  const handleZeroPosition = () => {
+    // A verificação de conexão é crucial
+    if (!isConnected) {
+      console.warn("Comando 'ZERAR' não enviado: Pivô não conectado.");
+      return;
+    }
+    console.log("Enviando comando para zerar a posição...");
+    ws.current.send("ZERAR");
+  };
+
   const handleToggleRotation = async () => {
     if (!pivotData || !isConnected) {
       console.warn(
@@ -198,10 +208,6 @@ const App = () => {
         }
       };
 
-      ws.current.onerror = (e) => {
-        console.error("Erro no WebSocket:", e.message);
-      };
-
       ws.current.onclose = () => {
         console.log(
           "Desconectado do ESP32. Tentando reconectar em 3 segundos..."
@@ -312,6 +318,7 @@ const App = () => {
           onChangePower={handleChangePower}
           onChangeWaterFlow={handleChangeWaterFlow}
           isConnected={isConnected}
+          onZeroPosition={handleZeroPosition}
         />
 
         <View style={styles.card}>

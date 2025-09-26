@@ -1,12 +1,10 @@
 // components/PieChart.js
 
 import React from "react";
-// Add the 'Text' component to this import line
 import { View, StyleSheet, Text } from "react-native";
 import Svg, { G, Path, Line, Circle } from "react-native-svg";
 
-const PieChart = ({ data, isAnimating, direction, power }) => {
-  // This check will now work correctly
+const PieChart = ({ data, rotationAngle }) => {
   if (!data || data.length === 0) {
     return (
       <View style={styles.chartContainer}>
@@ -20,7 +18,9 @@ const PieChart = ({ data, isAnimating, direction, power }) => {
   return (
     <View style={styles.chartContainer}>
       <Svg height="150" width="150" viewBox="0 0 100 100">
-        <G rotation="-90" origin="50, 50">
+        {/* Usamos a propriedade 'rotationAngle' para a rotação dinâmica. */}
+        {/* O '-90' inicial garante que o primeiro setor comece no topo. */}
+        <G rotation={-90 + rotationAngle} origin="50, 50">
           {data.map((slice, index) => {
             const percentage = slice.percentage;
             const startAngle = (totalPercentage * 360) / 100;
@@ -51,7 +51,6 @@ const PieChart = ({ data, isAnimating, direction, power }) => {
           />
         </G>
 
-        {/* The center circle, also from react-native-svg */}
         <Circle cx="50" cy="50" r="14" fill="#E5E7EB" />
       </Svg>
     </View>

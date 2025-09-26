@@ -11,15 +11,12 @@ const MainControls = ({
   onToggleDirection,
   onChangePower,
   onChangeWaterFlow,
-  isConnected, // 1. Recebendo o novo prop
+  isConnected,
+  onZeroPosition,
 }) => {
-  // 2. Lógica de controle atualizada
-  // Controles de ajuste (direção, potência, etc.) só funcionam se CONECTADO e PARADO.
   const isAdjustable = status === "Parado" && isConnected;
-  // O botão de ligar/desligar a rotação só funciona se CONECTADO.
   const isRotationButtonEnabled = isConnected;
 
-  // Funções para aplicar estilos de desabilitado
   const getRotationButtonStyle = () => {
     if (!isRotationButtonEnabled) {
       return styles.disabledButton;
@@ -46,10 +43,11 @@ const MainControls = ({
       <Text style={styles.title}>Controle Principal</Text>
 
       <View style={styles.buttonRow}>
+        {/* ... (Botões de Rotação e Direção continuam aqui) ... */}
         <TouchableOpacity
           onPress={onToggleRotation}
           style={[styles.controlButton, getRotationButtonStyle()]}
-          disabled={!isRotationButtonEnabled} // 3. Usando a nova lógica
+          disabled={!isRotationButtonEnabled}
         >
           <Text style={styles.buttonText}>
             {status === "Rodando" ? "Parar Rotação" : "Iniciar Rotação"}
@@ -59,7 +57,7 @@ const MainControls = ({
         <TouchableOpacity
           onPress={onToggleDirection}
           style={[styles.controlButton, getDirectionButtonStyle()]}
-          disabled={!isAdjustable} // 3. Usando a nova lógica
+          disabled={!isAdjustable}
         >
           <Text style={[styles.buttonText, getDirectionTextColor()]}>
             {direction}
@@ -67,6 +65,7 @@ const MainControls = ({
         </TouchableOpacity>
       </View>
 
+      {/* ... (Sliders de Potência e Vazão continuam aqui) ... */}
       <View style={styles.sliderContainer}>
         <Text
           style={[styles.sliderLabel, !isAdjustable && styles.disabledText]}
@@ -82,7 +81,7 @@ const MainControls = ({
           onSlidingComplete={onChangePower}
           minimumTrackTintColor={isAdjustable ? "#22C55E" : "#D1D5DB"}
           maximumTrackTintColor="#D1D5DB"
-          disabled={!isAdjustable} // 3. Usando a nova lógica
+          disabled={!isAdjustable}
         />
       </View>
 
@@ -101,14 +100,27 @@ const MainControls = ({
           onSlidingComplete={onChangeWaterFlow}
           minimumTrackTintColor={isAdjustable ? "#3B82F6" : "#D1D5DB"}
           maximumTrackTintColor="#D1D5DB"
-          disabled={!isAdjustable} // 3. Usando a nova lógica
+          disabled={!isAdjustable}
         />
       </View>
+
+      {/* 2. NOVO BOTÃO PARA ZERAR A POSIÇÃO */}
+      <TouchableOpacity
+        onPress={onZeroPosition}
+        style={[
+          styles.zeroButton,
+          !isRotationButtonEnabled && styles.disabledButton, // Reutiliza a lógica de desabilitar
+        ]}
+        disabled={!isRotationButtonEnabled}
+      >
+        <Text style={styles.buttonText}>Zerar Posição</Text>
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // ... (todos os seus estilos anteriores)
   container: {
     backgroundColor: "#FFFFFF",
     padding: 15,
@@ -146,13 +158,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
   },
   directionButton: {
-    backgroundColor: "#E0F2FE", // Um azul claro para o botão de direção
+    backgroundColor: "#E0F2FE",
   },
   directionText: {
-    color: "#374151", // Texto escuro para melhor contraste
+    color: "#374151",
   },
   disabledDirectionText: {
-    color: "#9CA3AF", // Texto cinza quando desabilitado
+    color: "#9CA3AF",
   },
   buttonText: {
     color: "#FFFFFF",
@@ -172,12 +184,21 @@ const styles = StyleSheet.create({
     height: 40,
     marginTop: 5,
   },
-  // 4. Estilos para desabilitado
   disabledButton: {
-    backgroundColor: "#D1D5DB", // Cinza claro
+    backgroundColor: "#D1D5DB",
   },
   disabledText: {
-    color: "#9CA3AF", // Cinza escuro
+    color: "#9CA3AF",
+  },
+
+  // 3. ESTILO PARA O NOVO BOTÃO
+  zeroButton: {
+    backgroundColor: "#60A5FA", // Um tom de azul
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 5, // Espaçamento para separar dos sliders
   },
 });
 
