@@ -95,9 +95,9 @@ const MainControls = ({
         onPress={onZeroPosition}
         style={[
           styles.zeroButton,
-          !isRotationButtonEnabled && styles.disabledButton,
+          !isAdjustable && styles.disabledButton, // Mude de !isRotationButtonEnabled para !isAdjustable
         ]}
-        disabled={!isRotationButtonEnabled}
+        disabled={!isAdjustable} // Mude de !isRotationButtonEnabled para !isAdjustable
       >
         <Text style={styles.buttonText}>Zerar Posição</Text>
       </TouchableOpacity>

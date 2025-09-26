@@ -1,31 +1,38 @@
+// components/StatusCard.js
+
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
-const StatusCard = ({ color, label, value, status, onToggle }) => {
+// 1. Adicionamos a nova prop 'isAdjustable'
+const StatusCard = ({
+  color,
+  label,
+  value,
+  status,
+  onToggle,
+  isAdjustable,
+}) => {
   return (
-    // Substituindo o 'div' por 'View' para o container do card
-    <View style={styles.card}>
-      {/* View para agrupar o círculo de status e o texto */}
+    // 2. Adicionamos um estilo que aplica opacidade se não for ajustável
+    <View style={[styles.card, !isAdjustable && styles.disabledCard]}>
       <View style={styles.labelContainer}>
-        {/* O círculo de status. O background é dinâmico */}
         <View style={[styles.statusCircle, { backgroundColor: color }]}></View>
         <Text style={styles.labelText}>{label}</Text>
       </View>
 
-      {/* View para agrupar o valor e o botão */}
       <View style={styles.controlContainer}>
         <Text style={styles.valueText}>{value}</Text>
 
-        {/* TouchableOpacity adiciona o comportamento de toque ao botão */}
         <TouchableOpacity
           onPress={onToggle}
           style={[
             styles.toggleButton,
             { backgroundColor: status ? "#22C55E" : "#9CA3AF" },
           ]}
-          activeOpacity={0.7} // Controla a opacidade quando o botão é pressionado
+          activeOpacity={0.7}
+          // 3. Adicionamos a propriedade 'disabled' para bloquear o toque
+          disabled={!isAdjustable}
         >
-          {/* A 'bola' do botão de toggle */}
           <View
             style={[
               styles.toggleBall,
@@ -38,16 +45,19 @@ const StatusCard = ({ color, label, value, status, onToggle }) => {
   );
 };
 
-// StyleSheet.create é usado para otimizar os estilos
 const styles = StyleSheet.create({
   card: {
-    flexDirection: "row", // Alinha os itens na horizontal
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "#F9FAFB",
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
+  },
+  // 4. Novo estilo para o feedback visual de desabilitado
+  disabledCard: {
+    opacity: 0.5,
   },
   labelContainer: {
     flexDirection: "row",
@@ -85,8 +95,6 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 10,
     backgroundColor: "#FFFFFF",
-    // Transição de animação no React Native é feita de forma diferente (LayoutAnimation)
-    // por enquanto, vamos focar apenas na posição
   },
   toggleOn: {
     transform: [{ translateX: 19 }],

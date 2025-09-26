@@ -78,10 +78,11 @@ const App = () => {
       !pivotData ||
       !pivotData.sectors ||
       !pivotData.sectors[key] ||
-      !isConnected
+      !isConnected || // Já verifica a conexão
+      pivotData.status.rotation_status === "Rodando" // <-- NOVA VERIFICAÇÃO
     ) {
       console.warn(
-        "Comando não enviado: Não conectado ao pivô ou dados não carregados."
+        "Comando não enviado: Pivô desconectado, rodando ou dados indisponíveis."
       );
       return;
     }
@@ -318,6 +319,10 @@ const App = () => {
             .sort()
             .map((key) => {
               const sector = pivotData.sectors[key];
+              // Criamos a mesma lógica de "ajustável" para os setores
+              const isSectorAdjustable =
+                isConnected && pivotData.status.rotation_status === "Parado";
+
               return (
                 <StatusCard
                   key={key}
@@ -326,6 +331,7 @@ const App = () => {
                   status={sector.is_active}
                   color={sector.color}
                   onToggle={() => handleToggleStatus(key)}
+                  isAdjustable={isSectorAdjustable}
                 />
               );
             })}
