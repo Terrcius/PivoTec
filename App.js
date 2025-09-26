@@ -130,18 +130,6 @@ const App = () => {
     });
   };
 
-  const handleChangeWaterFlow = (value) => {
-    if (!pivotData || !isConnected) {
-      console.warn(
-        "Comando não enviado: Pivô não conectado ou dados não carregados."
-      );
-      return;
-    }
-    update(ref(database, "pivots/pivot_001/status"), {
-      water_flow: parseInt(value, 10),
-    });
-  };
-
   useEffect(() => {
     const onDataChange = onValue(pivotRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -312,11 +300,9 @@ const App = () => {
           status={pivotData.status.rotation_status}
           direction={pivotData.status.direction}
           power={pivotData.status.power}
-          waterFlow={pivotData.status.water_flow}
           onToggleRotation={handleToggleRotation}
           onToggleDirection={handleToggleDirection}
           onChangePower={handleChangePower}
-          onChangeWaterFlow={handleChangeWaterFlow}
           isConnected={isConnected}
           onZeroPosition={handleZeroPosition}
         />
