@@ -1,5 +1,3 @@
-// components/MainControls.js
-
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import Slider from "@react-native-community/slider";
@@ -13,8 +11,35 @@ const MainControls = ({
   onToggleDirection,
   onChangePower,
   onChangeWaterFlow,
+  isConnected, // 1. Recebendo o novo prop
 }) => {
-  const isControllable = status === "Parado";
+  // 2. Lógica de controle atualizada
+  // Controles de ajuste (direção, potência, etc.) só funcionam se CONECTADO e PARADO.
+  const isAdjustable = status === "Parado" && isConnected;
+  // O botão de ligar/desligar a rotação só funciona se CONECTADO.
+  const isRotationButtonEnabled = isConnected;
+
+  // Funções para aplicar estilos de desabilitado
+  const getRotationButtonStyle = () => {
+    if (!isRotationButtonEnabled) {
+      return styles.disabledButton;
+    }
+    return status === "Rodando" ? styles.stopButton : styles.startButton;
+  };
+
+  const getDirectionButtonStyle = () => {
+    if (!isAdjustable) {
+      return styles.disabledButton;
+    }
+    return styles.directionButton;
+  };
+
+  const getDirectionTextColor = () => {
+    if (!isAdjustable) {
+      return styles.disabledDirectionText;
+    }
+    return styles.directionText;
+  };
 
   return (
     <View style={styles.container}>
@@ -23,10 +48,8 @@ const MainControls = ({
       <View style={styles.buttonRow}>
         <TouchableOpacity
           onPress={onToggleRotation}
-          style={[
-            styles.controlButton,
-            status === "Rodando" ? styles.stopButton : styles.startButton,
-          ]}
+          style={[styles.controlButton, getRotationButtonStyle()]}
+          disabled={!isRotationButtonEnabled} // 3. Usando a nova lógica
         >
           <Text style={styles.buttonText}>
             {status === "Rodando" ? "Parar Rotação" : "Iniciar Rotação"}
@@ -35,16 +58,10 @@ const MainControls = ({
 
         <TouchableOpacity
           onPress={onToggleDirection}
-          style={[
-            styles.controlButton,
-            styles.directionButton,
-            !isControllable && styles.disabledButton,
-          ]}
-          disabled={!isControllable}
+          style={[styles.controlButton, getDirectionButtonStyle()]}
+          disabled={!isAdjustable} // 3. Usando a nova lógica
         >
-          <Text
-            style={[styles.buttonText, !isControllable && styles.disabledText]}
-          >
+          <Text style={[styles.buttonText, getDirectionTextColor()]}>
             {direction}
           </Text>
         </TouchableOpacity>
@@ -52,7 +69,7 @@ const MainControls = ({
 
       <View style={styles.sliderContainer}>
         <Text
-          style={[styles.sliderLabel, !isControllable && styles.disabledText]}
+          style={[styles.sliderLabel, !isAdjustable && styles.disabledText]}
         >
           Potência da Rotação: ({power}%)
         </Text>
@@ -63,15 +80,15 @@ const MainControls = ({
           step={1}
           value={power}
           onSlidingComplete={onChangePower}
-          minimumTrackTintColor="#22C55E"
+          minimumTrackTintColor={isAdjustable ? "#22C55E" : "#D1D5DB"}
           maximumTrackTintColor="#D1D5DB"
-          disabled={!isControllable}
+          disabled={!isAdjustable} // 3. Usando a nova lógica
         />
       </View>
 
       <View style={styles.sliderContainer}>
         <Text
-          style={[styles.sliderLabel, !isControllable && styles.disabledText]}
+          style={[styles.sliderLabel, !isAdjustable && styles.disabledText]}
         >
           Vazão da Água: ({waterFlow}%)
         </Text>
@@ -82,9 +99,9 @@ const MainControls = ({
           step={1}
           value={waterFlow}
           onSlidingComplete={onChangeWaterFlow}
-          minimumTrackTintColor="#3B82F6"
+          minimumTrackTintColor={isAdjustable ? "#3B82F6" : "#D1D5DB"}
           maximumTrackTintColor="#D1D5DB"
-          disabled={!isControllable}
+          disabled={!isAdjustable} // 3. Usando a nova lógica
         />
       </View>
     </View>
@@ -129,7 +146,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
   },
   directionButton: {
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#E0F2FE", // Um azul claro para o botão de direção
+  },
+  directionText: {
+    color: "#374151", // Texto escuro para melhor contraste
+  },
+  disabledDirectionText: {
+    color: "#9CA3AF", // Texto cinza quando desabilitado
   },
   buttonText: {
     color: "#FFFFFF",
@@ -149,11 +172,12 @@ const styles = StyleSheet.create({
     height: 40,
     marginTop: 5,
   },
+  // 4. Estilos para desabilitado
   disabledButton: {
-    opacity: 0.5,
+    backgroundColor: "#D1D5DB", // Cinza claro
   },
   disabledText: {
-    color: "#9CA3AF",
+    color: "#9CA3AF", // Cinza escuro
   },
 });
 

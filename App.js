@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { StyleSheet, View, Text, ScrollView } from "react-native";
 import PieChart from "./components/PieChart";
 import StatusCard from "./components/StatusCard";
@@ -35,35 +35,24 @@ const pivotRef = ref(database, "pivots/pivot_001");
 const App = () => {
   const [pivotData, setPivotData] = useState(null);
   const [view, setView] = useState("home");
+  const [isConnected, setIsConnected] = useState(false);
+  const [currentRotation, setCurrentRotation] = useState(0);
+  const [reconnectTimer, setReconnectTimer] = useState(0);
+  const ws = useRef(null);
 
   const handleToggleRotation = async () => {
-    if (!pivotData) return;
+    if (!pivotData || !isConnected) {
+      console.warn(
+        "Comando não enviado: Pivô não conectado ou dados não carregados."
+      );
+      return;
+    }
 
     const newStatus =
       pivotData.status.rotation_status === "Rodando" ? "Parado" : "Rodando";
 
-    // Lógica para enviar o comando HTTP para o ESP32
-    if (newStatus === "Rodando") {
-      // ---- QUANDO COMEÇA A RODAR ----
-      try {
-        console.log("Enviando comando /led1/on para o ESP32...");
-        await fetch("http://192.168.15.117/led1/on");
-        console.log("Comando ON enviado com sucesso.");
-      } catch (error) {
-        console.error("Falha ao enviar comando ON para o ESP32:", error);
-      }
-    } else {
-      // ---- QUANDO PARA DE RODAR ----
-      try {
-        console.log("Enviando comando /led1/off para o ESP32...");
-        await fetch("http://192.168.15.117/led1/off");
-        console.log("Comando OFF enviado com sucesso.");
-      } catch (error) {
-        console.error("Falha ao enviar comando OFF para o ESP32:", error);
-      }
-    }
+    ws.current.send(newStatus === "Rodando" ? "ON" : "OFF");
 
-    // A atualização do status no Firebase ocorre independentemente do comando HTTP
     try {
       await update(ref(database, "pivots/pivot_001/status"), {
         rotation_status: newStatus,
@@ -75,7 +64,15 @@ const App = () => {
   };
 
   const handleToggleStatus = (key) => {
-    if (!pivotData || !pivotData.sectors || !pivotData.sectors[key]) {
+    if (
+      !pivotData ||
+      !pivotData.sectors ||
+      !pivotData.sectors[key] ||
+      !isConnected
+    ) {
+      console.warn(
+        "Comando não enviado: Não conectado ao pivô ou dados não carregados."
+      );
       return;
     }
 
@@ -94,21 +91,42 @@ const App = () => {
   };
 
   const handleToggleDirection = () => {
-    if (!pivotData) return;
+    if (!pivotData || !isConnected) {
+      console.warn(
+        "Comando não enviado: Pivô não conectado ou dados não carregados."
+      );
+      return;
+    }
     const newDirection =
       pivotData.status.direction === "Horário" ? "Anti-horário" : "Horário";
+    ws.current.send(newDirection === "Anti-horário" ? "ANT" : "HOR");
     update(ref(database, "pivots/pivot_001/status"), {
       direction: newDirection,
     });
   };
 
   const handleChangePower = (value) => {
+    if (!pivotData || !isConnected) {
+      console.warn(
+        "Comando não enviado: Pivô não conectado ou dados não carregados."
+      );
+      return;
+    }
+    let powerAsInt = parseInt(value, 10);
+    let powerAsString = powerAsInt.toString();
+    ws.current.send(powerAsString);
     update(ref(database, "pivots/pivot_001/status"), {
       power: parseInt(value, 10),
     });
   };
 
   const handleChangeWaterFlow = (value) => {
+    if (!pivotData || !isConnected) {
+      console.warn(
+        "Comando não enviado: Pivô não conectado ou dados não carregados."
+      );
+      return;
+    }
     update(ref(database, "pivots/pivot_001/status"), {
       water_flow: parseInt(value, 10),
     });
@@ -123,51 +141,99 @@ const App = () => {
         setPivotData(null);
       }
     });
-    return () => onValue(pivotRef, onDataChange);
+    // A função de limpeza do onValue é a própria função de unsubscribe que ele retorna
+    return onDataChange;
   }, []);
 
   useEffect(() => {
-    const fetchSensorData = async () => {
-      try {
-        console.log("Buscando dados dos sensores do ESP32...");
-        const response = await fetch("http://192.168.15.117/sensor");
-        const sensorJson = await response.json();
+    let countdownInterval;
 
-        console.log("Dados recebidos:", sensorJson);
+    const connectWebSocket = () => {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+      setReconnectTimer(0);
 
-        // Verificamos se os dados esperados (temp e umid) existem
-        if (sensorJson.temp !== undefined && sensorJson.umid !== undefined) {
-          // Atualiza os dados diretamente no Firebase
-          const sensorRef = ref(database, "pivots/pivot_001/sensors");
-          await update(sensorRef, {
-            temperature: sensorJson.temp,
-            air_humidity: sensorJson.umid, // Mapeando 'umid' para 'umidade do solo'
-          });
-          console.log("Dados dos sensores atualizados no Firebase.");
+      // COLOQUE O IP CORRETO DO SEU ESP32 AQUI
+      ws.current = new WebSocket("ws://192.168.137.234:81");
+
+      ws.current.onopen = () => {
+        console.log("Conectado ao ESP32 via WebSocket!");
+        setIsConnected(true);
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          setReconnectTimer(0);
         }
-      } catch (error) {
-        console.error(
-          "Falha ao buscar ou atualizar dados dos sensores:",
-          error
+      };
+
+      ws.current.onmessage = (e) => {
+        if (
+          typeof e.data === "string" &&
+          e.data.startsWith("{") &&
+          e.data.endsWith("}")
+        ) {
+          try {
+            const message = JSON.parse(e.data);
+
+            if (message.temp !== undefined && message.umid !== undefined) {
+              const sensorRef = ref(database, "pivots/pivot_001/sensors");
+              update(sensorRef, {
+                temperature: message.temp,
+                air_humidity: message.umid,
+                angle: message.ang,
+              });
+            }
+
+            if (message.ang !== undefined) {
+              setCurrentRotation(parseFloat(message.ang));
+            }
+          } catch (error) {
+            console.error(
+              "Erro ao processar o JSON recebido do WebSocket:",
+              error
+            );
+          }
+        } else {
+          console.log("Recebida mensagem de status do ESP32:", e.data);
+        }
+      };
+
+      ws.current.onerror = (e) => {
+        console.error("Erro no WebSocket:", e.message);
+      };
+
+      ws.current.onclose = () => {
+        console.log(
+          "Desconectado do ESP32. Tentando reconectar em 3 segundos..."
         );
+        setIsConnected(false);
+
+        let timer = 3;
+        setReconnectTimer(timer);
+
+        countdownInterval = setInterval(() => {
+          timer -= 1;
+          setReconnectTimer(timer);
+
+          if (timer === 0) {
+            clearInterval(countdownInterval);
+            setTimeout(connectWebSocket, 100);
+          }
+        }, 1000);
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (ws.current) {
+        ws.current.close();
+      }
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
       }
     };
-
-    // Roda a função uma vez imediatamente ao carregar o app
-    fetchSensorData();
-
-    // Configura o intervalo para rodar a cada 5 minutos
-    // 5 minutos = 5 * 60 segundos * 1000 milissegundos
-    const intervalId = setInterval(fetchSensorData, 20 * 1000);
-
-    // Função de limpeza: para o intervalo quando o componente é desmontado
-    return () => {
-      console.log("Parando a busca periódica de sensores.");
-      clearInterval(intervalId);
-    };
-  }, []); // O array vazio garante que este efeito rode apenas uma vez
-
-  // ... resto do seu componente App ...
+  }, []);
 
   if (!pivotData) {
     return (
@@ -176,6 +242,12 @@ const App = () => {
       </SafeAreaView>
     );
   }
+
+  const connectionMessage = isConnected
+    ? null
+    : reconnectTimer > 0
+    ? `Tentando reconexão em ${reconnectTimer} segundos...`
+    : "Conectando ao pivô...";
 
   if (view === "temp") {
     return (
@@ -222,6 +294,7 @@ const App = () => {
           <View style={styles.chartWrapper}>
             <PieChart
               data={pieData}
+              rotationAngle={currentRotation}
               isAnimating={pivotData.status.rotation_status === "Rodando"}
               direction={pivotData.status.direction}
               power={pivotData.status.power}
@@ -238,10 +311,16 @@ const App = () => {
           onToggleDirection={handleToggleDirection}
           onChangePower={handleChangePower}
           onChangeWaterFlow={handleChangeWaterFlow}
+          isConnected={isConnected}
         />
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Status dos Setores</Text>
+          {!isConnected && (
+            <Text style={[styles.disconnectedText, styles.connectingText]}>
+              {connectionMessage}
+            </Text>
+          )}
           {Object.keys(pivotData.sectors)
             .sort()
             .map((key) => {
@@ -282,6 +361,16 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
+  disconnectedText: {
+    textAlign: "center",
+    color: "#ef4444",
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  connectingText: {
+    color: "#F59E0B",
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
