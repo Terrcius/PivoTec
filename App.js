@@ -1,13 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, View, Text, ScrollView } from "react-native";
-import PieChart from "./components/PieChart";
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  SafeAreaView,
+  ActivityIndicator,
+} from "react-native";
+import PivotVisualization from "./components/PivotVisualization";
 import StatusCard from "./components/StatusCard";
 import MetricCard from "./components/MetricCard";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, update } from "firebase/database";
 import MainControls from "./components/MainControls";
 import DetailedGraphsPage from "./components/DetailedGraphsPage";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   FIREBASE_API_KEY,
   FIREBASE_AUTH_DOMAIN,
@@ -36,12 +43,12 @@ const App = () => {
   const [pivotData, setPivotData] = useState(null);
   const [view, setView] = useState("home");
   const [isConnected, setIsConnected] = useState(false);
-  const [currentRotation, setCurrentRotation] = useState(0);
+  // 1. ADICIONE UM ESTADO SEPARADO PARA O ÂNGULO
+  const [currentAngle, setCurrentAngle] = useState(0);
   const [reconnectTimer, setReconnectTimer] = useState(0);
   const ws = useRef(null);
 
   const handleZeroPosition = () => {
-    // A verificação de conexão é crucial
     if (!isConnected) {
       console.warn("Comando 'ZERAR' não enviado: Pivô não conectado.");
       return;
@@ -78,8 +85,8 @@ const App = () => {
       !pivotData ||
       !pivotData.sectors ||
       !pivotData.sectors[key] ||
-      !isConnected || // Já verifica a conexão
-      pivotData.status.rotation_status === "Rodando" // <-- NOVA VERIFICAÇÃO
+      !isConnected ||
+      pivotData.status.rotation_status === "Rodando"
     ) {
       console.warn(
         "Comando não enviado: Pivô desconectado, rodando ou dados indisponíveis."
@@ -90,15 +97,16 @@ const App = () => {
     const currentStatus = pivotData.sectors[key].is_active;
     const newStatus = !currentStatus;
 
+    const sectorNumber = key.replace("sector_", "");
+    const statusValue = newStatus ? 1 : 0;
+    const command = `S${sectorNumber}=${statusValue}`;
+
+    console.log(`Enviando comando do setor via WebSocket: ${command}`);
+    ws.current.send(command);
+
     update(ref(database, `pivots/pivot_001/sectors/${key}`), {
       is_active: newStatus,
-    })
-      .then(() => {
-        console.log(`Status do setor ${key} atualizado para: ${newStatus}`);
-      })
-      .catch((error) => {
-        console.error("Erro ao atualizar o status do setor:", error);
-      });
+    });
   };
 
   const handleToggleDirection = () => {
@@ -140,7 +148,6 @@ const App = () => {
         setPivotData(null);
       }
     });
-    // A função de limpeza do onValue é a própria função de unsubscribe que ele retorna
     return onDataChange;
   }, []);
 
@@ -148,59 +155,31 @@ const App = () => {
     let countdownInterval;
 
     const connectWebSocket = () => {
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-      }
+      if (countdownInterval) clearInterval(countdownInterval);
       setReconnectTimer(0);
 
       // COLOQUE O IP CORRETO DO SEU ESP32 AQUI
-      ws.current = new WebSocket("ws://192.168.137.234:81");
+      ws.current = new WebSocket("ws://192.168.137.14:81");
 
       ws.current.onopen = () => {
         console.log("Conectado ao ESP32 via WebSocket!");
         setIsConnected(true);
-        if (countdownInterval) {
-          clearInterval(countdownInterval);
-          setReconnectTimer(0);
-        }
       };
-
       ws.current.onmessage = (e) => {
-        if (
-          typeof e.data === "string" &&
-          e.data.startsWith("{") &&
-          e.data.endsWith("}")
-        ) {
-          try {
-            const message = JSON.parse(e.data);
-
-            if (message.temp !== undefined && message.umid !== undefined) {
-              const sensorRef = ref(database, "pivots/pivot_001/sensors");
-              update(sensorRef, {
-                temperature: message.temp,
-                air_humidity: message.umid,
-                angle: message.ang,
-              });
-            }
-
-            if (message.ang !== undefined) {
-              setCurrentRotation(parseFloat(message.ang));
-            }
-          } catch (error) {
-            console.error(
-              "Erro ao processar o JSON recebido do WebSocket:",
-              error
-            );
+        console.log("Recebida mensagem do ESP32:", e.data);
+        // 2. ADICIONE A LÓGICA DE PARSE DO JSON DE VOLTA
+        try {
+          const message = JSON.parse(e.data);
+          if (message.ang !== undefined) {
+            setCurrentAngle(parseFloat(message.ang));
           }
-        } else {
-          console.log("Recebida mensagem de status do ESP32:", e.data);
+        } catch (error) {
+          // Ignora erros se a mensagem não for JSON (ex: "Conectado!")
         }
       };
 
       ws.current.onclose = () => {
-        console.log(
-          "Desconectado do ESP32. Tentando reconectar em 3 segundos..."
-        );
+        console.log("Desconectado do ESP32. Tentando reconectar...");
         setIsConnected(false);
 
         let timer = 3;
@@ -209,10 +188,9 @@ const App = () => {
         countdownInterval = setInterval(() => {
           timer -= 1;
           setReconnectTimer(timer);
-
           if (timer === 0) {
             clearInterval(countdownInterval);
-            setTimeout(connectWebSocket, 100);
+            connectWebSocket();
           }
         }, 1000);
       };
@@ -221,18 +199,15 @@ const App = () => {
     connectWebSocket();
 
     return () => {
-      if (ws.current) {
-        ws.current.close();
-      }
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-      }
+      if (ws.current) ws.current.close();
+      if (countdownInterval) clearInterval(countdownInterval);
     };
   }, []);
 
   if (!pivotData) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
         <Text style={styles.loadingText}>Carregando dados do pivô...</Text>
       </SafeAreaView>
     );
@@ -241,60 +216,29 @@ const App = () => {
   const connectionMessage = isConnected
     ? null
     : reconnectTimer > 0
-    ? `Tentando reconexão em ${reconnectTimer} segundos...`
+    ? `Tentando reconexão em ${reconnectTimer}s...`
     : "Conectando ao pivô...";
 
-  if (view === "temp") {
-    return (
-      <DetailedGraphsPage
-        type="Temperatura"
-        unit="°C"
-        color="#FFA500"
-        onGoBack={() => setView("home")}
-      />
-    );
-  } else if (view === "soil-humidity") {
-    return (
-      <DetailedGraphsPage
-        type="Umidade do Solo"
-        unit="%"
-        color="#4F89BC"
-        onGoBack={() => setView("home")}
-      />
-    );
-  } else if (view === "air-humidity") {
-    return (
-      <DetailedGraphsPage
-        type="Umidade do Ar"
-        unit="%"
-        color="#8884d8"
-        onGoBack={() => setView("home")}
-      />
-    );
+  if (view === "temp" || view === "soil-humidity" || view === "air-humidity") {
+    const pageDetails = {
+      temp: { type: "Temperatura", unit: "°C", color: "#FFA500" },
+      "soil-humidity": { type: "Umidade do Solo", unit: "%", color: "#4F89BC" },
+      "air-humidity": { type: "Umidade do Ar", unit: "%", color: "#8884d8" },
+    };
+    const details = pageDetails[view];
+    return <DetailedGraphsPage {...details} onGoBack={() => setView("home")} />;
   }
-
-  const pieData = Object.keys(pivotData.sectors)
-    .sort()
-    .map((key) => pivotData.sectors[key])
-    .map((sector) => ({
-      percentage: 100 / Object.keys(pivotData.sectors).length,
-      color: sector.is_active ? sector.color : "#d1d5db",
-    }));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F2F5" }}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Visualização do Pivô</Text>
-          <View style={styles.chartWrapper}>
-            <PieChart
-              data={pieData}
-              rotationAngle={currentRotation}
-              isAnimating={pivotData.status.rotation_status === "Rodando"}
-              direction={pivotData.status.direction}
-              power={pivotData.status.power}
-            />
-          </View>
+          <Text style={styles.cardTitle}>Posição do Pivô</Text>
+          {/* Passando o ângulo e os setores para o componente de visualização */}
+          <PivotVisualization
+            angle={currentAngle}
+            sectors={pivotData.sectors}
+          />
         </View>
 
         <MainControls
@@ -310,7 +254,7 @@ const App = () => {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Status dos Setores</Text>
-          {!isConnected && (
+          {connectionMessage && (
             <Text style={[styles.disconnectedText, styles.connectingText]}>
               {connectionMessage}
             </Text>
@@ -319,7 +263,6 @@ const App = () => {
             .sort()
             .map((key) => {
               const sector = pivotData.sectors[key];
-              // Criamos a mesma lógica de "ajustável" para os setores
               const isSectorAdjustable =
                 isConnected && pivotData.status.rotation_status === "Parado";
 
@@ -377,6 +320,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F2F5",
   },
   loadingText: {
+    marginTop: 10,
     textAlign: "center",
     fontSize: 16,
     color: "#6B7280",
@@ -397,13 +341,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
     color: "#374151",
-  },
-  chartWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-    height: 150,
-    width: 150,
-    alignSelf: "center",
   },
   metricsContainer: {
     flexDirection: "row",
