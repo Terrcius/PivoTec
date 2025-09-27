@@ -43,7 +43,6 @@ const App = () => {
   const [pivotData, setPivotData] = useState(null);
   const [view, setView] = useState("home");
   const [isConnected, setIsConnected] = useState(false);
-  // 1. ADICIONE UM ESTADO SEPARADO PARA O ÂNGULO
   const [currentAngle, setCurrentAngle] = useState(0);
   const [reconnectTimer, setReconnectTimer] = useState(0);
   const ws = useRef(null);
@@ -159,7 +158,7 @@ const App = () => {
       setReconnectTimer(0);
 
       // COLOQUE O IP CORRETO DO SEU ESP32 AQUI
-      ws.current = new WebSocket("ws://192.168.137.14:81");
+      ws.current = new WebSocket("ws://192.168.137.18:81");
 
       ws.current.onopen = () => {
         console.log("Conectado ao ESP32 via WebSocket!");
@@ -167,15 +166,12 @@ const App = () => {
       };
       ws.current.onmessage = (e) => {
         console.log("Recebida mensagem do ESP32:", e.data);
-        // 2. ADICIONE A LÓGICA DE PARSE DO JSON DE VOLTA
         try {
           const message = JSON.parse(e.data);
           if (message.ang !== undefined) {
             setCurrentAngle(parseFloat(message.ang));
           }
-        } catch (error) {
-          // Ignora erros se a mensagem não for JSON (ex: "Conectado!")
-        }
+        } catch (error) {}
       };
 
       ws.current.onclose = () => {

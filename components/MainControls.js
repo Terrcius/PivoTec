@@ -99,7 +99,7 @@ const MainControls = ({
         ]}
         disabled={!isAdjustable} // Mude de !isRotationButtonEnabled para !isAdjustable
       >
-        <Text style={styles.buttonText}>Zerar Posição</Text>
+        <Text style={styles.buttonText}>Definir Posição Inicial</Text>
       </TouchableOpacity>
     </View>
   );

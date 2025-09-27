@@ -1,60 +1,87 @@
 import React from "react";
-import { View, StyleSheet, Text } from "react-native";
+import { View, StyleSheet } from "react-native";
 
-// Este componente agora também recebe o objeto 'sectors'
 const PivotVisualization = ({ angle, sectors = {} }) => {
-  const pivotArmStyle = {
+  const pivotContainerStyle = {
     transform: [{ rotate: `${angle}deg` }],
   };
 
-  // Garante uma ordem consistente dos setores
   const sectorKeys = Object.keys(sectors).sort();
-  const numSectors = sectorKeys.length;
-  const sliceAngle = numSectors > 0 ? 360 / numSectors : 0;
+
+  // Função para obter os dados de um setor de forma segura
+  const getSector = (index) => {
+    if (sectorKeys[index]) {
+      const sector = sectors[sectorKeys[index]];
+      return {
+        is_active: sector.is_active,
+        color: sector.color || "#3B82F6",
+      };
+    }
+    // Retorna um setor padrão inativo se os dados não existirem
+    return { is_active: false, color: "#D1D5DB" };
+  };
+
+  // Mapeia os setores para os arcos
+  const arcs = [
+    getSector(0), // Top-Right
+    getSector(1), // Bottom-Right
+    getSector(2), // Bottom-Left
+    getSector(3), // Top-Left
+  ];
+
+  // Array para criar as 4 linhas separadoras
+  const separators = [0, 1]; // Só precisamos de 2 linhas para formar a cruz
 
   return (
     <View style={styles.container}>
-      {/* Wrapper para centralizar a base e os pontos dos setores */}
       <View style={styles.visualizationWrapper}>
-        <View style={styles.base}>
-          <View style={[styles.pivotArm, pivotArmStyle]}>
-            <View style={styles.pivotTip} />
-          </View>
-          <View style={styles.centerCircle} />
+        {/* Camada 1: Os arcos dos setores */}
+        <View style={styles.arcsContainer}>
+          {arcs.map((arc, index) => (
+            <View
+              key={`arc-${index}`}
+              style={[
+                styles.arcWrapper,
+                { transform: [{ rotate: `${index * 90}deg` }] },
+              ]}
+            >
+              <View
+                style={[
+                  styles.arc,
+                  { borderTopColor: arc.is_active ? arc.color : "#E5E7EB" },
+                ]}
+              />
+            </View>
+          ))}
         </View>
 
-        {/* Renderiza os pontos de status dos setores ao redor da base */}
-        {numSectors > 0 &&
-          sectorKeys.map((key, index) => {
-            const sector = sectors[key];
-            // Calcula o ângulo para posicionar o ponto
-            const sectorAngle = index * sliceAngle;
+        {/* Camada 2: Linhas separadoras para criar o efeito de cruz */}
+        <View style={styles.separatorsContainer}>
+          {separators.map((_, index) => (
+            <View
+              key={`sep-${index}`}
+              style={[
+                styles.separatorLine,
+                // **CORREÇÃO 1: Rotaciona para formar a cruz (0 e 90 graus)**
+                { transform: [{ rotate: `${index * 90}deg` }] },
+              ]}
+            />
+          ))}
+        </View>
 
-            // Usa trigonometria para posicionar os pontos em um círculo
-            // -90 graus para começar do topo (posição de 12 horas)
-            const angleRad = (sectorAngle - 90) * (Math.PI / 180);
-            const radius = 85; // Distância do centro onde os pontos aparecerão
+        {/* Camada 3: A base cinza interna, agora por cima dos separadores */}
+        <View style={styles.innerBase} />
 
-            const dotStyle = {
-              // A posição é calculada a partir do centro do wrapper
-              top: "50%",
-              left: "50%",
-              // A transformação move o ponto para sua posição final no círculo
-              transform: [
-                { translateX: radius * Math.cos(angleRad) - 6 }, // -6 para centralizar o ponto (metade da sua largura)
-                { translateY: radius * Math.sin(angleRad) - 6 }, // -6 para centralizar o ponto (metade da sua altura)
-              ],
-              // Usa a cor do setor se estiver ativo, senão usa um cinza
-              backgroundColor: sector.is_active
-                ? sector.color || "#3B82F6"
-                : "#A1A1AA",
-            };
+        {/* Camada 4: O braço giratório do pivô */}
+        <View style={[styles.pivotArmContainer, pivotContainerStyle]}>
+          <View style={styles.pivotArm}>
+            <View style={styles.pivotTip} />
+          </View>
+        </View>
 
-            return <View key={key} style={[styles.sectorDot, dotStyle]} />;
-          })}
+        {/* Camada 5: Ponto central para acabamento */}
+        <View style={styles.centerCircle} />
       </View>
-
-      <Text style={styles.angleText}>{Math.round(angle)}°</Text>
     </View>
   );
 };
@@ -64,25 +91,87 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
-    paddingBottom: 20, // Espaço para o texto do ângulo abaixo
+    paddingVertical: 20,
   },
   visualizationWrapper: {
-    width: 200, // Tamanho aumentado para acomodar os pontos
-    height: 200, // Tamanho aumentado para acomodar os pontos
+    width: 170,
+    height: 170,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative", // Essencial para posicionar os pontos absolutamente
+    position: "relative",
   },
-  base: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: "#E5E7EB",
+  arcsContainer: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    zIndex: 1, // Camada base
+  },
+  arcWrapper: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 10,
-    borderColor: "#D1D5DB",
-    position: "absolute", // Garante que fique no centro do wrapper
+  },
+  arc: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 85,
+    borderWidth: 12,
+    borderBottomColor: "transparent",
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    transform: [{ rotate: "-45deg" }],
+  },
+  separatorsContainer: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    zIndex: 2, // Acima dos arcos
+  },
+  separatorLine: {
+    position: "absolute",
+    left: "50%",
+    top: 0,
+    marginLeft: -1.5,
+    width: 3,
+    height: "100%",
+    backgroundColor: "#FFFFFF",
+  },
+  innerBase: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    // **CORREÇÃO 2: zIndex maior para cobrir o centro dos separadores**
+    zIndex: 3,
+  },
+  pivotArmContainer: {
+    position: "absolute",
+    width: 130,
+    height: 130,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 4, // Acima da base interna
+  },
+  pivotArm: {
+    width: "48%",
+    height: 6,
+    backgroundColor: "#3B82F6",
+    borderRadius: 3,
+    position: "absolute",
+    left: "50%",
+  },
+  pivotTip: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#1D4ED8",
+    position: "absolute",
+    right: -7,
+    top: -4,
   },
   centerCircle: {
     width: 15,
@@ -90,40 +179,7 @@ const styles = StyleSheet.create({
     borderRadius: 7.5,
     backgroundColor: "#4B5563",
     position: "absolute",
-    zIndex: 2,
-  },
-  pivotArm: {
-    width: "50%",
-    height: 8,
-    backgroundColor: "#3B82F6",
-    borderRadius: 4,
-    position: "absolute",
-    left: "50%",
-    zIndex: 1,
-  },
-  pivotTip: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#1D4ED8",
-    position: "absolute",
-    right: -8,
-    top: -4,
-  },
-  angleText: {
-    marginTop: 5,
-    fontWeight: "bold",
-    fontSize: 18,
-    color: "#374151",
-  },
-  sectorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: "#FFFFFF",
-    position: "absolute", // Essencial para o posicionamento
-    zIndex: 3,
+    zIndex: 5, // Camada superior
   },
 });
 
