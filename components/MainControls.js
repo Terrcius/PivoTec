@@ -1,325 +1,187 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { MaterialCommunityIcons, Feather, Ionicons } from "@expo/vector-icons";
+// components/MainControls.js
+
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import Slider from "@react-native-community/slider";
 
 const MainControls = ({
   status,
   direction,
   power,
-  uvLightStatus,
-  waterFlow,
-  uvIntensity,
   onToggleRotation,
   onToggleDirection,
   onChangePower,
-  onToggleUVLight,
-  onChangeFlow,
-  onChangeUVIntensity,
   isConnected,
-  onZeroPosition, // Esta função agora deve definir o ângulo para 1
+  onZeroPosition,
 }) => {
-  const isRotating = status === "Rodando";
-  const isAntiClockwise = direction === "Anti-horário";
-  const isUVLightOn = uvLightStatus === "Ligada";
+  const [displayPower, setDisplayPower] = useState(power);
 
-  // Estado local para evitar que o slider "salte" durante o arrasto
-  const [localPower, setLocalPower] = useState(power);
-  const [localFlow, setLocalFlow] = useState(waterFlow);
-  const [localUVIntensity, setLocalUVIntensity] = useState(uvIntensity);
-
-  // Atualiza estados locais quando as props mudam de fora (Firebase)
-  React.useEffect(() => {
-    setLocalPower(power);
+  useEffect(() => {
+    setDisplayPower(power);
   }, [power]);
 
-  React.useEffect(() => {
-    setLocalFlow(waterFlow);
-  }, [waterFlow]);
+  const isAdjustable = status === "Parado" && isConnected;
+  const isRotationButtonEnabled = isConnected;
 
-  React.useEffect(() => {
-    setLocalUVIntensity(uvIntensity);
-  }, [uvIntensity]);
-
-  const getRotationButtonStyles = () => {
-    if (!isConnected) {
+  const getRotationButtonStyle = () => {
+    if (!isRotationButtonEnabled) {
       return styles.disabledButton;
     }
-    return isRotating ? styles.stopButton : styles.startButton;
+    return status === "Rodando" ? styles.stopButton : styles.startButton;
   };
 
-  const getRotationButtonTextStyles = () => {
-    return isRotating ? styles.stopButtonText : styles.startButtonText;
+  const getDirectionButtonStyle = () => {
+    if (!isAdjustable) {
+      return styles.disabledButton;
+    }
+    return styles.directionButton;
   };
 
-  const getFlowSliderStyles = () => {
-    return isConnected ? styles.slider : styles.sliderDisabled;
-  };
-
-  const getUVIntensitySliderStyles = () => {
-    return isConnected ? styles.slider : styles.sliderDisabled;
+  const getDirectionTextColor = () => {
+    if (!isAdjustable) {
+      return styles.disabledDirectionText;
+    }
+    return styles.directionText;
   };
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Controle Principal</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Controle Principal</Text>
 
-      {/* LINHA 1: Rotação e Direção */}
-      <View style={styles.row}>
-        {/* Botão de Ligar/Desligar Rotação */}
+      {/* CÓDIGO DOS BOTÕES REINSERIDO AQUI */}
+      <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={[styles.controlButton, getRotationButtonStyles()]}
           onPress={onToggleRotation}
-          disabled={!isConnected}
+          style={[styles.controlButton, getRotationButtonStyle()]}
+          disabled={!isRotationButtonEnabled}
         >
-          <Ionicons
-            name={isRotating ? "pause" : "play"}
-            size={24}
-            color={isRotating ? "#FFFFFF" : isConnected ? "#10B981" : "#A1A1AA"}
-          />
-          <Text style={getRotationButtonTextStyles()}>
-            {isRotating ? "Parar Rotação" : "Iniciar Rotação"}
+          <Text style={styles.buttonText}>
+            {status === "Rodando" ? "Parar Rotação" : "Iniciar Rotação"}
           </Text>
         </TouchableOpacity>
 
-        {/* Botão de Direção */}
         <TouchableOpacity
-          style={[
-            styles.controlButton,
-            styles.secondaryButton,
-            !isConnected && styles.disabledButton,
-          ]}
           onPress={onToggleDirection}
-          disabled={!isConnected}
+          style={[styles.controlButton, getDirectionButtonStyle()]}
+          disabled={!isAdjustable}
         >
-          <Feather
-            name="refresh-cw"
-            size={24}
-            color={
-              isAntiClockwise && isConnected
-                ? "#3B82F6"
-                : isConnected
-                ? "#374151"
-                : "#A1A1AA"
-            }
-          />
-          <Text
-            style={[
-              styles.secondaryButtonText,
-              isAntiClockwise && isConnected ? styles.activeText : null,
-            ]}
-          >
-            {isAntiClockwise ? "Anti-horário" : "Horário"}
+          <Text style={[styles.buttonText, getDirectionTextColor()]}>
+            {direction}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* LINHA 2: Luz UV e Posição Inicial */}
-      <View style={styles.row}>
-        {/* Botão de Luz UV */}
-        <TouchableOpacity
-          style={[
-            styles.controlButton,
-            styles.secondaryButton,
-            !isConnected && styles.disabledButton,
-          ]}
-          onPress={onToggleUVLight}
-          disabled={!isConnected}
+      <View style={styles.sliderContainer}>
+        <Text
+          style={[styles.sliderLabel, !isAdjustable && styles.disabledText]}
         >
-          <MaterialCommunityIcons
-            name={isUVLightOn ? "sun-wireless" : "weather-sunny-off"}
-            size={24}
-            color={
-              isUVLightOn && isConnected
-                ? "#F59E0B"
-                : isConnected
-                ? "#374151"
-                : "#A1A1AA"
-            }
-          />
-          <Text
-            style={[
-              styles.secondaryButtonText,
-              isUVLightOn && isConnected ? styles.activeText : null,
-            ]}
-          >
-            Luz UV {isUVLightOn ? "LIGADA" : "DESLIGADA"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Botão de Definir Posição Inicial (Zerar) */}
-        <TouchableOpacity
-          style={[
-            styles.controlButton,
-            styles.secondaryButton,
-            (!isConnected || isRotating) && styles.disabledButton,
-          ]}
-          onPress={onZeroPosition}
-          disabled={!isConnected || isRotating}
-        >
-          <MaterialCommunityIcons
-            name="target"
-            size={24}
-            color={!isConnected || isRotating ? "#A1A1AA" : "#374151"}
-          />
-          <Text style={styles.secondaryButtonText}>
-            Definir Posição Inicial
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ----------------------------------------------------- */}
-      {/* CONTROLE: VAZÃO DA ÁGUA */}
-      {/* ----------------------------------------------------- */}
-      <View style={styles.sliderContainer}>
-        <Text style={styles.sliderLabel}>
-          Vazão da Água: ({Math.round(localFlow)}%)
+          Potência da Rotação: ({Math.round(displayPower)}%)
         </Text>
         <Slider
-          style={getFlowSliderStyles()}
+          style={styles.slider}
           minimumValue={0}
           maximumValue={100}
-          minimumTrackTintColor="#3B82F6"
-          maximumTrackTintColor="#A1A1AA"
-          thumbTintColor="#3B82F6"
-          value={localFlow}
-          onValueChange={setLocalFlow}
-          onSlidingComplete={onChangeFlow}
-          disabled={!isConnected}
+          step={1}
+          value={displayPower}
+          onValueChange={(value) => setDisplayPower(value)}
+          onSlidingComplete={() => onChangePower(displayPower)}
+          minimumTrackTintColor={isAdjustable ? "#22C55E" : "#D1D5DB"}
+          maximumTrackTintColor="#D1D5DB"
+          disabled={!isAdjustable}
         />
       </View>
 
-      {/* ----------------------------------------------------- */}
-      {/* CONTROLE: INTENSIDADE UV */}
-      {/* ----------------------------------------------------- */}
-      <View style={styles.sliderContainer}>
-        <Text style={styles.sliderLabel}>
-          Intensidade UV: ({Math.round(localUVIntensity)}%)
-        </Text>
-        <Slider
-          style={getUVIntensitySliderStyles()}
-          minimumValue={0}
-          maximumValue={100}
-          minimumTrackTintColor="#F59E0B"
-          maximumTrackTintColor="#A1A1AA"
-          thumbTintColor="#F59E0B"
-          value={localUVIntensity}
-          onValueChange={setLocalUVIntensity}
-          onSlidingComplete={onChangeUVIntensity}
-          disabled={!isConnected}
-        />
-      </View>
-
-      {/* CONTROLE: POTÊNCIA DA ROTAÇÃO */}
-      <View style={styles.sliderContainer}>
-        <Text style={styles.sliderLabel}>
-          Potência da Rotação: ({Math.round(localPower)}%)
-        </Text>
-        <Slider
-          style={isConnected ? styles.slider : styles.sliderDisabled}
-          minimumValue={0}
-          maximumValue={100}
-          minimumTrackTintColor="#EF4444"
-          maximumTrackTintColor="#A1A1AA"
-          thumbTintColor="#EF4444"
-          value={localPower}
-          onValueChange={setLocalPower}
-          onSlidingComplete={onChangePower}
-          disabled={!isConnected}
-        />
-      </View>
+      <TouchableOpacity
+        onPress={onZeroPosition}
+        style={[
+          styles.zeroButton,
+          !isAdjustable && styles.disabledButton, // Mude de !isRotationButtonEnabled para !isAdjustable
+        ]}
+        disabled={!isAdjustable} // Mude de !isRotationButtonEnabled para !isAdjustable
+      >
+        <Text style={styles.buttonText}>Definir Posição Inicial</Text>
+      </TouchableOpacity>
     </View>
   );
 };
 
-// Os estilos permanecem os mesmos...
 const styles = StyleSheet.create({
-  card: {
+  container: {
     backgroundColor: "#FFFFFF",
     padding: 15,
     borderRadius: 12,
-    marginBottom: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+    marginBottom: 10,
   },
-  cardTitle: {
-    fontSize: 18,
+  title: {
+    fontSize: 16,
     fontWeight: "bold",
     marginBottom: 10,
     color: "#374151",
   },
-  row: {
+  buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 15,
   },
   controlButton: {
     flex: 1,
-    height: 60,
+    padding: 12,
     borderRadius: 8,
-    marginHorizontal: 5,
-    justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 8,
+    justifyContent: "center",
+    marginHorizontal: 5,
   },
   startButton: {
-    backgroundColor: "#D1FAE5",
-    borderWidth: 1,
-    borderColor: "#10B981",
-  },
-  startButtonText: {
-    color: "#10B981",
-    fontSize: 12,
-    fontWeight: "bold",
-    marginTop: 4,
+    backgroundColor: "#22C55E",
   },
   stopButton: {
     backgroundColor: "#EF4444",
   },
-  stopButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "bold",
-    marginTop: 4,
+  directionButton: {
+    backgroundColor: "#E0F2FE",
   },
-  secondaryButton: {
-    backgroundColor: "#E5E7EB",
-    borderWidth: 0,
-  },
-  secondaryButtonText: {
+  directionText: {
     color: "#374151",
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 4,
   },
-  activeText: {
+  disabledDirectionText: {
+    color: "#9CA3AF",
+  },
+  buttonText: {
+    color: "#FFFFFF",
     fontWeight: "bold",
-  },
-  disabledButton: {
-    backgroundColor: "#F3F4F6",
-    opacity: 0.6,
+    fontSize: 14,
   },
   sliderContainer: {
-    marginTop: 15,
-    paddingHorizontal: 5,
+    marginBottom: 10,
   },
   sliderLabel: {
     fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 5,
-    color: "#4B5563",
+    fontWeight: "500",
+    color: "#374151",
   },
   slider: {
     width: "100%",
-    height: 40,
+    height: 60,
+    marginTop: 5,
   },
-  sliderDisabled: {
-    width: "100%",
-    height: 40,
-    opacity: 0.4,
+  disabledButton: {
+    backgroundColor: "#D1D5DB",
+  },
+  disabledText: {
+    color: "#9CA3AF",
+  },
+  zeroButton: {
+    backgroundColor: "#60A5FA",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 5,
   },
 });
 

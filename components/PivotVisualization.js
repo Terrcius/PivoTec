@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Text } from "react-native";
+import { View, StyleSheet } from "react-native";
 
 const PivotVisualization = ({ angle, sectors = {} }) => {
   const pivotContainerStyle = {
@@ -7,10 +7,8 @@ const PivotVisualization = ({ angle, sectors = {} }) => {
   };
 
   const sectorKeys = Object.keys(sectors).sort();
-  const sectorCount = sectorKeys.length;
-  const validSectorCount = sectorCount > 0 ? sectorCount : 4;
-  const sectorAngle = 360 / validSectorCount;
 
+  // Função para obter os dados de um setor de forma segura
   const getSector = (index) => {
     if (sectorKeys[index]) {
       const sector = sectors[sectorKeys[index]];
@@ -19,78 +17,59 @@ const PivotVisualization = ({ angle, sectors = {} }) => {
         color: sector.color || "#3B82F6",
       };
     }
+    // Retorna um setor padrão inativo se os dados não existirem
     return { is_active: false, color: "#D1D5DB" };
   };
 
-  const arcs = [];
-  for (let i = 0; i < validSectorCount; i++) {
-    arcs.push(getSector(i));
-  }
+  // Mapeia os setores para os arcos
+  const arcs = [
+    getSector(0), // Top-Right
+    getSector(1), // Bottom-Right
+    getSector(2), // Bottom-Left
+    getSector(3), // Top-Left
+  ];
+
+  // Array para criar as 4 linhas separadoras
+  const separators = [0, 1]; // Só precisamos de 2 linhas para formar a cruz
 
   return (
     <View style={styles.container}>
       <View style={styles.visualizationWrapper}>
-        {/* Informação sobre setores - NOVA POSIÇÃO */}
-        <View style={styles.infoContainer}>
-          <View style={styles.infoText}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoDot} />
-              <View style={styles.infoLabelContainer}>
-                <Text style={styles.infoLabel}>
-                  Setores: {validSectorCount}
-                </Text>
-                <Text style={styles.infoSubLabel}>
-                  {sectorAngle.toFixed(0)}° cada
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Camada 1: Os arcos dos setores COM GAPS */}
+        {/* Camada 1: Os arcos dos setores */}
         <View style={styles.arcsContainer}>
           {arcs.map((arc, index) => (
             <View
               key={`arc-${index}`}
               style={[
                 styles.arcWrapper,
-                {
-                  transform: [{ rotate: `${index * sectorAngle}deg` }],
-                },
+                { transform: [{ rotate: `${index * 90}deg` }] },
               ]}
             >
               <View
                 style={[
                   styles.arc,
-                  {
-                    borderTopColor: arc.is_active ? arc.color : "#E5E7EB",
-                    transform: [{ rotate: `-${sectorAngle / 2 - 2}deg` }],
-                    borderTopWidth: 12,
-                  },
+                  { borderTopColor: arc.is_active ? arc.color : "#E5E7EB" },
                 ]}
               />
             </View>
           ))}
         </View>
 
-        {/* Camada 2: Linhas separadoras (agora são os gaps) */}
+        {/* Camada 2: Linhas separadoras para criar o efeito de cruz */}
         <View style={styles.separatorsContainer}>
-          {arcs.map((_, index) => (
+          {separators.map((_, index) => (
             <View
               key={`sep-${index}`}
               style={[
                 styles.separatorLine,
-                {
-                  transform: [{ rotate: `${index * sectorAngle}deg` }],
-                  width: 4,
-                  marginLeft: -2,
-                },
+                // **CORREÇÃO 1: Rotaciona para formar a cruz (0 e 90 graus)**
+                { transform: [{ rotate: `${index * 90}deg` }] },
               ]}
             />
           ))}
         </View>
 
-        {/* Camada 3: A base cinza interna */}
+        {/* Camada 3: A base cinza interna, agora por cima dos separadores */}
         <View style={styles.innerBase} />
 
         {/* Camada 4: O braço giratório do pivô */}
@@ -100,7 +79,7 @@ const PivotVisualization = ({ angle, sectors = {} }) => {
           </View>
         </View>
 
-        {/* Camada 5: Ponto central */}
+        {/* Camada 5: Ponto central para acabamento */}
         <View style={styles.centerCircle} />
       </View>
     </View>
@@ -125,7 +104,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: "100%",
     height: "100%",
-    zIndex: 1,
+    zIndex: 1, // Camada base
   },
   arcWrapper: {
     width: "100%",
@@ -142,19 +121,20 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
+    transform: [{ rotate: "-45deg" }],
   },
   separatorsContainer: {
     position: "absolute",
     width: "100%",
     height: "100%",
-    zIndex: 2,
+    zIndex: 2, // Acima dos arcos
   },
   separatorLine: {
     position: "absolute",
     left: "50%",
     top: 0,
-    marginLeft: -2,
-    width: 4,
+    marginLeft: -1.5,
+    width: 3,
     height: "100%",
     backgroundColor: "#FFFFFF",
   },
@@ -165,6 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     borderWidth: 1,
     borderColor: "#E5E7EB",
+    // **CORREÇÃO 2: zIndex maior para cobrir o centro dos separadores**
     zIndex: 3,
   },
   pivotArmContainer: {
@@ -173,7 +154,7 @@ const styles = StyleSheet.create({
     height: 130,
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 4,
+    zIndex: 4, // Acima da base interna
   },
   pivotArm: {
     width: "48%",
@@ -198,52 +179,7 @@ const styles = StyleSheet.create({
     borderRadius: 7.5,
     backgroundColor: "#4B5563",
     position: "absolute",
-    zIndex: 5,
-  },
-  infoContainer: {
-    position: "absolute",
-    top: 140, // Ajustado para ficar acima do círculo
-    right: -95, // Ajustado para ficar à direita
-    zIndex: 6,
-  },
-  infoText: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  infoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#3B82F6",
-    marginRight: 6,
-  },
-  infoLabelContainer: {
-    alignItems: "flex-start",
-  },
-  infoLabel: {
-    fontSize: 11,
-    fontWeight: "bold",
-    color: "#374151",
-  },
-  infoSubLabel: {
-    fontSize: 9,
-    color: "#6B7280",
+    zIndex: 5, // Camada superior
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,168 +6,174 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
+import { LineChart, Grid } from "react-native-svg-charts";
+import * as shape from "d3-shape";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 
-const DetailedGraphsPage = ({ type, unit, color, currentValue, onGoBack }) => {
-  const [historicalData, setHistoricalData] = useState([]);
+// Dados simulados para o gráfico.
+const tempHistoryDay = [24, 25, 26, 25, 24, 23, 22];
+const tempHistoryWeek = [25, 24, 27, 26, 28, 25, 27];
+const tempHistoryMonth = [20, 22, 24, 26, 23, 25, 27, 24, 26, 25, 23, 22, 21];
 
-  // Simula dados históricos
-  useEffect(() => {
-    const generateMockData = () => {
-      const data = [];
-      for (let i = 0; i < 24; i++) {
-        data.push({
-          hour: `${i.toString().padStart(2, "0")}:00`,
-          value: currentValue + (Math.random() * 10 - 5), // Variação aleatória
-        });
-      }
-      return data;
-    };
+const soilHumidityHistoryDay = [50, 52, 55, 54, 53, 51, 50];
+const soilHumidityHistoryWeek = [55, 58, 52, 50, 57, 53, 55];
+const soilHumidityHistoryMonth = [
+  60, 62, 58, 55, 59, 56, 54, 58, 60, 57, 55, 53, 52,
+];
 
-    setHistoricalData(generateMockData());
-  }, [currentValue]);
+const airHumidityHistoryDay = [65, 67, 68, 70, 69, 66, 65];
+const airHumidityHistoryWeek = [72, 70, 68, 65, 69, 71, 70];
+const airHumidityHistoryMonth = [
+  75, 73, 68, 66, 70, 72, 74, 71, 69, 68, 67, 66, 65,
+];
 
-  // Função simples para renderizar barras do gráfico
-  const renderSimpleBarChart = () => {
-    const maxValue = Math.max(...historicalData.map((item) => item.value));
-    const minValue = Math.min(...historicalData.map((item) => item.value));
+// O componente do gráfico de linha
+const LineGraph = ({ data, color, unit }) => {
+  return (
+    <LineChart
+      style={{ height: 200 }}
+      data={data}
+      svg={{ stroke: color, strokeWidth: 2 }}
+      contentInset={{ top: 20, bottom: 20 }}
+      curve={shape.curveNatural}
+    >
+      <Grid svg={{ stroke: "#E5E7EB" }} />
+    </LineChart>
+  );
+};
 
-    return (
-      <View style={styles.chartContainer}>
-        <View style={styles.barChart}>
-          {historicalData.map((item, index) => {
-            const height =
-              ((item.value - minValue) / (maxValue - minValue)) * 100;
-            return (
-              <View key={index} style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: Math.max(height, 5), backgroundColor: color },
-                  ]}
-                />
-                {index % 4 === 0 && (
-                  <Text style={styles.barLabel}>{item.hour}</Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    );
+// O componente da página detalhada
+const DetailedGraphsPage = ({ type, unit, color, onGoBack }) => {
+  const [timeRange, setTimeRange] = useState("day");
+
+  const getHistoryData = () => {
+    switch (type) {
+      case "Temperatura":
+        switch (timeRange) {
+          case "day":
+            return tempHistoryDay;
+          case "week":
+            return tempHistoryWeek;
+          case "month":
+            return tempHistoryMonth;
+          default:
+            return [];
+        }
+      case "Umidade do Solo":
+        switch (timeRange) {
+          case "day":
+            return soilHumidityHistoryDay;
+          case "week":
+            return soilHumidityHistoryWeek;
+          case "month":
+            return soilHumidityHistoryMonth;
+          default:
+            return [];
+        }
+      case "Umidade do Ar":
+        switch (timeRange) {
+          case "day":
+            return airHumidityHistoryDay;
+          case "week":
+            return airHumidityHistoryWeek;
+          case "month":
+            return airHumidityHistoryMonth;
+          default:
+            return [];
+        }
+      default:
+        return [];
+    }
   };
 
+  const historyData = getHistoryData();
+  const yMin = Math.min(...historyData);
+  const yMax = Math.max(...historyData);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F2F5" }}>
+      <ScrollView contentContainerStyle={styles.container}>
         <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#374151" />
+          <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalhes de {type}</Text>
-      </View>
 
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* Card: Valor Atual */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Valor Atual</Text>
-          <View style={styles.currentValueContainer}>
-            <Text style={[styles.currentValue, { color }]}>
-              {currentValue} {unit}
+        <Text style={styles.title}>{type} Detalhada</Text>
+
+        <View style={styles.rangeButtons}>
+          <TouchableOpacity
+            onPress={() => setTimeRange("day")}
+            style={[
+              styles.rangeButton,
+              timeRange === "day" && styles.activeRangeButton,
+            ]}
+          >
+            <Text
+              style={[
+                styles.rangeButtonText,
+                timeRange === "day" && styles.activeRangeButtonText,
+              ]}
+            >
+              Dia
             </Text>
-            <View
-              style={[styles.statusIndicator, { backgroundColor: color }]}
-            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setTimeRange("week")}
+            style={[
+              styles.rangeButton,
+              timeRange === "week" && styles.activeRangeButton,
+            ]}
+          >
+            <Text
+              style={[
+                styles.rangeButtonText,
+                timeRange === "week" && styles.activeRangeButtonText,
+              ]}
+            >
+              Semana
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setTimeRange("month")}
+            style={[
+              styles.rangeButton,
+              timeRange === "month" && styles.activeRangeButton,
+            ]}
+          >
+            <Text
+              style={[
+                styles.rangeButtonText,
+                timeRange === "month" && styles.activeRangeButtonText,
+              ]}
+            >
+              Mês
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.metricSummary}>
+          <View style={styles.metricBox}>
+            <Text style={styles.metricLabel}>Atual</Text>
+            <Text style={[styles.metricValue, { color: color }]}>{`${
+              historyData[historyData.length - 1]
+            }${unit}`}</Text>
+          </View>
+          <View style={styles.metricBox}>
+            <Text style={styles.metricLabel}>Mínimo</Text>
+            <Text
+              style={[styles.metricValue, { color: "#EF4444" }]}
+            >{`${yMin}${unit}`}</Text>
+          </View>
+          <View style={styles.metricBox}>
+            <Text style={styles.metricLabel}>Máximo</Text>
+            <Text
+              style={[styles.metricValue, { color: "#3B82F6" }]}
+            >{`${yMax}${unit}`}</Text>
           </View>
         </View>
 
-        {/* Card: Gráfico Simples */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Histórico (Últimas 24h)</Text>
-          {renderSimpleBarChart()}
-        </View>
-
-        {/* Card: Dados Históricos */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Dados Detalhados</Text>
-          <View style={styles.dataGrid}>
-            <View style={styles.dataItem}>
-              <Text style={styles.dataLabel}>Máximo</Text>
-              <Text style={styles.dataValue}>
-                {Math.max(...historicalData.map((item) => item.value)).toFixed(
-                  1
-                )}{" "}
-                {unit}
-              </Text>
-            </View>
-            <View style={styles.dataItem}>
-              <Text style={styles.dataLabel}>Mínimo</Text>
-              <Text style={styles.dataValue}>
-                {Math.min(...historicalData.map((item) => item.value)).toFixed(
-                  1
-                )}{" "}
-                {unit}
-              </Text>
-            </View>
-            <View style={styles.dataItem}>
-              <Text style={styles.dataLabel}>Média</Text>
-              <Text style={styles.dataValue}>
-                {(
-                  historicalData.reduce((sum, item) => sum + item.value, 0) /
-                  historicalData.length
-                ).toFixed(1)}{" "}
-                {unit}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Card: Tabela de Dados */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Últimas Leituras</Text>
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={styles.tableHeaderText}>Horário</Text>
-              <Text style={styles.tableHeaderText}>Valor</Text>
-            </View>
-            {historicalData.slice(-6).map((item, index) => (
-              <View key={index} style={styles.tableRow}>
-                <Text style={styles.tableCell}>{item.hour}</Text>
-                <Text style={styles.tableCell}>
-                  {item.value.toFixed(1)} {unit}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Card: Estatísticas */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Estatísticas</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Ionicons name="trending-up" size={24} color="#10B981" />
-              <Text style={styles.statValue}>+2.5%</Text>
-              <Text style={styles.statLabel}>Variação</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons name="time" size={24} color="#3B82F6" />
-              <Text style={styles.statValue}>24h</Text>
-              <Text style={styles.statLabel}>Período</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons name="pulse" size={24} color="#EF4444" />
-              <Text style={styles.statValue}>
-                {(
-                  (Math.max(...historicalData.map((item) => item.value)) -
-                    Math.min(...historicalData.map((item) => item.value))) /
-                  2
-                ).toFixed(1)}
-              </Text>
-              <Text style={styles.statLabel}>Amplitude</Text>
-            </View>
-          </View>
+        <View style={styles.chartCard}>
+          <Text style={styles.chartTitle}>Gráfico de Histórico</Text>
+          <LineGraph data={historyData} color={color} unit={unit} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -175,150 +181,73 @@ const DetailedGraphsPage = ({ type, unit, color, currentValue, onGoBack }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F0F2F5",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  backButton: {
-    padding: 5,
-    marginRight: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#374151",
-  },
-  contentContainer: {
+  container: {
     padding: 15,
   },
-  card: {
+  backButton: {
+    marginBottom: 10,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: "#4B5563",
+    fontWeight: "bold",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1F2937",
+    marginBottom: 20,
+  },
+  rangeButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  rangeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 5,
+  },
+  rangeButtonText: {
+    color: "#4B5563",
+  },
+  activeRangeButton: {
+    backgroundColor: "#22C55E",
+  },
+  activeRangeButtonText: {
+    color: "#FFFFFF",
+  },
+  metricSummary: {
+    flexDirection: "row",
+    justifyContent: "space-around",
     backgroundColor: "#FFFFFF",
-    padding: 20,
     borderRadius: 12,
-    marginBottom: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    padding: 15,
+    marginBottom: 20,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#374151",
-    marginBottom: 15,
-  },
-  currentValueContainer: {
-    flexDirection: "row",
+  metricBox: {
     alignItems: "center",
-    justifyContent: "space-between",
   },
-  currentValue: {
-    fontSize: 32,
-    fontWeight: "bold",
-  },
-  statusIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  chartContainer: {
-    marginTop: 10,
-  },
-  barChart: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    height: 150,
-    paddingHorizontal: 5,
-  },
-  barContainer: {
-    flex: 1,
-    alignItems: "center",
-    marginHorizontal: 2,
-  },
-  bar: {
-    width: 8,
-    borderRadius: 4,
-    marginBottom: 5,
-  },
-  barLabel: {
-    fontSize: 8,
-    color: "#6B7280",
-    transform: [{ rotate: "-45deg" }],
-  },
-  dataGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  dataItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  dataLabel: {
+  metricLabel: {
     fontSize: 12,
     color: "#6B7280",
-    marginBottom: 5,
   },
-  dataValue: {
+  metricValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  chartCard: {
+    backgroundColor: "#FFFFFF",
+    padding: 15,
+    borderRadius: 12,
+  },
+  chartTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#374151",
-  },
-  table: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#F9FAFB",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  tableHeaderText: {
-    flex: 1,
-    fontWeight: "bold",
-    color: "#374151",
-  },
-  tableRow: {
-    flexDirection: "row",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  tableCell: {
-    flex: 1,
-    color: "#374151",
-  },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  statItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#374151",
-    marginTop: 5,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
+    color: "#1F2937",
+    marginBottom: 10,
   },
 });
 
