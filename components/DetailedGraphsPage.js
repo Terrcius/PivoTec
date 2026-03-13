@@ -153,9 +153,9 @@ const DetailedGraphsPage = ({ type, unit, color, onGoBack }) => {
         <View style={styles.metricSummary}>
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>Atual</Text>
-            <Text style={[styles.metricValue, { color: color }]}>{`${
-              historyData[historyData.length - 1]
-            }${unit}`}</Text>
+            <Text
+              style={[styles.metricValue, { color: color }]}
+            >{`${currentValue}${unit}`}</Text>
           </View>
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>Mínimo</Text>

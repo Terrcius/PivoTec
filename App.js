@@ -47,6 +47,108 @@ const App = () => {
   const [reconnectTimer, setReconnectTimer] = useState(0);
   const ws = useRef(null);
 
+  // --- NOVAS FUNÇÕES ADICIONADAS DO SEGUNDO CÓDIGO ---
+
+  // Controle de liga/desliga da bomba de água
+  const handleToggleWaterPump = () => {
+    if (!pivotData || !isConnected) {
+      console.warn("Comando da bomba não enviado: Pivô não conectado.");
+      return;
+    }
+
+    const currentStatus = pivotData.status.water_pump_status === "Ligada";
+    const newStatus = !currentStatus;
+
+    const statusString = newStatus ? "Ligada" : "Desligada";
+    const commandValue = newStatus ? "B=1" : "B=0";
+
+    console.log(`Enviando comando da bomba via WebSocket: ${commandValue}`);
+
+    try {
+      ws.current.send(commandValue);
+      update(ref(database, "pivots/pivot_001/status"), {
+        water_pump_status: statusString,
+        water_flow: newStatus ? 100 : 0,
+      });
+    } catch (error) {
+      console.error("Erro ao enviar comando da bomba via WebSocket:", error);
+    }
+  };
+
+  const handleChangeFlow = (value) => {
+    if (!pivotData || !isConnected) {
+      console.warn("Comando 'Vazão' não enviado: Pivô não conectado.");
+      return;
+    }
+
+    let flow = Math.round(value);
+    const command = `B=${flow}`;
+    console.log(`Enviando comando de Vazão via WebSocket: ${command}`);
+
+    try {
+      ws.current.send(command);
+      update(ref(database, "pivots/pivot_001/status"), {
+        water_flow: flow,
+        water_pump_status: flow > 0 ? "Ligada" : "Desligada",
+      });
+    } catch (error) {
+      console.error("Erro ao enviar comando de Vazão via WebSocket:", error);
+    }
+  };
+
+  const handleChangeUVIntensity = (value) => {
+    if (!pivotData || !isConnected) {
+      console.warn("Comando 'Intensidade UV' não enviado: Pivô não conectado.");
+      return;
+    }
+
+    let intensity = Math.round(value);
+    const command = `L=${intensity}`;
+    console.log(`Enviando comando de Intensidade UV via WebSocket: ${command}`);
+
+    try {
+      ws.current.send(command);
+      update(ref(database, "pivots/pivot_001/status"), {
+        uv_intensity: intensity,
+        uv_light_status: intensity > 0 ? "Ligada" : "Desligada",
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao enviar comando de Intensidade UV via WebSocket:",
+        error
+      );
+    }
+  };
+
+  const handleToggleUVLight = () => {
+    if (!pivotData || !isConnected) {
+      console.warn(
+        "Comando de Luz UV não enviado: Pivô desconectado ou dados do pivô não carregados."
+      );
+      return;
+    }
+
+    const currentStatus = pivotData.status.uv_light_status === "Ligada";
+    const newStatus = !currentStatus;
+
+    const statusString = newStatus ? "Ligada" : "Desligada";
+    const commandValue = newStatus ? "L=100" : "L=0";
+
+    console.log(`Enviando comando de Luz UV via WebSocket: ${commandValue}`);
+
+    try {
+      ws.current.send(commandValue);
+      update(ref(database, "pivots/pivot_001/status"), {
+        uv_light_status: statusString,
+        uv_intensity: newStatus ? 100 : 0,
+      });
+    } catch (error) {
+      console.error("Erro ao enviar comando de Luz UV via WebSocket:", error);
+    }
+  };
+
+  // --- FUNÇÕES ORIGINAIS DO PRIMEIRO CÓDIGO ---
+
   const handleZeroPosition = () => {
     if (!isConnected) {
       console.warn("Comando 'ZERAR' não enviado: Pivô não conectado.");
@@ -144,7 +246,37 @@ const App = () => {
         const data = snapshot.val();
         setPivotData(data);
       } else {
-        setPivotData(null);
+        // Dados padrão incluindo os novos campos
+        setPivotData({
+          status: {
+            rotation_status: "Parado",
+            direction: "Horário",
+            power: 17,
+            uv_light_status: "Desligada",
+            water_pump_status: "Desligada",
+            water_flow: 0,
+            uv_intensity: 0,
+          },
+          sectors: {
+            sector_1: {
+              crop: "Milho",
+              moisture: 70,
+              is_active: false,
+              color: "#FBBF24",
+            },
+            sector_2: {
+              crop: "Soja",
+              moisture: 65,
+              is_active: true,
+              color: "#34D399",
+            },
+          },
+          sensors: {
+            temperature: 30,
+            soil_humidity: 68,
+            air_humidity: 55,
+          },
+        });
       }
     });
     return onDataChange;
@@ -158,12 +290,13 @@ const App = () => {
       setReconnectTimer(0);
 
       // COLOQUE O IP CORRETO DO SEU ESP32 AQUI
-      ws.current = new WebSocket("ws://192.168.137.18:81");
+      ws.current = new WebSocket("ws://192.168.137.86:80/ws");
 
       ws.current.onopen = () => {
         console.log("Conectado ao ESP32 via WebSocket!");
         setIsConnected(true);
       };
+
       ws.current.onmessage = (e) => {
         console.log("Recebida mensagem do ESP32:", e.data);
         try {
@@ -171,7 +304,20 @@ const App = () => {
           if (message.ang !== undefined) {
             setCurrentAngle(parseFloat(message.ang));
           }
-        } catch (error) {}
+          // Processar mensagens de vazão e UV
+          if (message.temp !== undefined) {
+            update(ref(database, "pivots/pivot_001/sensors"), {
+              temperature: parseFloat(message.temp),
+            });
+          }
+          if (message.umid !== undefined) {
+            update(ref(database, "pivots/pivot_001/sensors"), {
+              air_humidity: parseFloat(message.umid),
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao processar mensagem do ESP32:", error);
+        }
       };
 
       ws.current.onclose = () => {
@@ -230,20 +376,28 @@ const App = () => {
       <ScrollView contentContainerStyle={styles.contentContainer}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Posição do Pivô</Text>
-          {/* Passando o ângulo e os setores para o componente de visualização */}
           <PivotVisualization
             angle={currentAngle}
             sectors={pivotData.sectors}
           />
         </View>
 
+        {/* MainControls atualizado com as novas props */}
         <MainControls
           status={pivotData.status.rotation_status}
           direction={pivotData.status.direction}
           power={pivotData.status.power}
+          uvLightStatus={pivotData.status.uv_light_status}
+          waterPumpStatus={pivotData.status.water_pump_status}
+          waterFlow={pivotData.status.water_flow}
+          uvIntensity={pivotData.status.uv_intensity}
           onToggleRotation={handleToggleRotation}
           onToggleDirection={handleToggleDirection}
           onChangePower={handleChangePower}
+          onToggleUVLight={handleToggleUVLight}
+          onToggleWaterPump={handleToggleWaterPump}
+          onChangeFlow={handleChangeFlow}
+          onChangeUVIntensity={handleChangeUVIntensity}
           isConnected={isConnected}
           onZeroPosition={handleZeroPosition}
         />
