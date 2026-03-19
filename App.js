@@ -115,7 +115,7 @@ const App = () => {
     } catch (error) {
       console.error(
         "Erro ao enviar comando de Intensidade UV via WebSocket:",
-        error
+        error,
       );
     }
   };
@@ -123,7 +123,7 @@ const App = () => {
   const handleToggleUVLight = () => {
     if (!pivotData || !isConnected) {
       console.warn(
-        "Comando de Luz UV não enviado: Pivô desconectado ou dados do pivô não carregados."
+        "Comando de Luz UV não enviado: Pivô desconectado ou dados do pivô não carregados.",
       );
       return;
     }
@@ -161,7 +161,7 @@ const App = () => {
   const handleToggleRotation = async () => {
     if (!pivotData || !isConnected) {
       console.warn(
-        "Comando não enviado: Pivô não conectado ou dados não carregados."
+        "Comando não enviado: Pivô não conectado ou dados não carregados.",
       );
       return;
     }
@@ -190,7 +190,7 @@ const App = () => {
       pivotData.status.rotation_status === "Rodando"
     ) {
       console.warn(
-        "Comando não enviado: Pivô desconectado, rodando ou dados indisponíveis."
+        "Comando não enviado: Pivô desconectado, rodando ou dados indisponíveis.",
       );
       return;
     }
@@ -213,7 +213,7 @@ const App = () => {
   const handleToggleDirection = () => {
     if (!pivotData || !isConnected) {
       console.warn(
-        "Comando não enviado: Pivô não conectado ou dados não carregados."
+        "Comando não enviado: Pivô não conectado ou dados não carregados.",
       );
       return;
     }
@@ -228,7 +228,7 @@ const App = () => {
   const handleChangePower = (value) => {
     if (!pivotData || !isConnected) {
       console.warn(
-        "Comando não enviado: Pivô não conectado ou dados não carregados."
+        "Comando não enviado: Pivô não conectado ou dados não carregados.",
       );
       return;
     }
@@ -358,8 +358,8 @@ const App = () => {
   const connectionMessage = isConnected
     ? null
     : reconnectTimer > 0
-    ? `Tentando reconexão em ${reconnectTimer}s...`
-    : "Conectando ao pivô...";
+      ? `Tentando reconexão em ${reconnectTimer}s...`
+      : "Conectando ao pivô...";
 
   if (view === "temp" || view === "soil-humidity" || view === "air-humidity") {
     const pageDetails = {

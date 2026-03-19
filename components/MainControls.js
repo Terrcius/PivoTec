@@ -100,8 +100,8 @@ const MainControls = ({
               isAntiClockwise && isConnected
                 ? "#3B82F6"
                 : isConnected
-                ? "#374151"
-                : "#A1A1AA"
+                  ? "#374151"
+                  : "#A1A1AA"
             }
           />
           <Text
@@ -134,8 +134,8 @@ const MainControls = ({
               isUVLightOn && isConnected
                 ? "#F59E0B"
                 : isConnected
-                ? "#374151"
-                : "#A1A1AA"
+                  ? "#374151"
+                  : "#A1A1AA"
             }
           />
           <Text
