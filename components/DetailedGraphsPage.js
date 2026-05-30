@@ -1,253 +1,319 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
-import { LineChart, Grid } from "react-native-svg-charts";
-import * as shape from "d3-shape";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { LineChart } from "react-native-chart-kit";
+import { dynamoDBService } from "../services/dynamoDBService";
 
-// Dados simulados para o gráfico.
-const tempHistoryDay = [24, 25, 26, 25, 24, 23, 22];
-const tempHistoryWeek = [25, 24, 27, 26, 28, 25, 27];
-const tempHistoryMonth = [20, 22, 24, 26, 23, 25, 27, 24, 26, 25, 23, 22, 21];
+const { width } = Dimensions.get("window");
 
-const soilHumidityHistoryDay = [50, 52, 55, 54, 53, 51, 50];
-const soilHumidityHistoryWeek = [55, 58, 52, 50, 57, 53, 55];
-const soilHumidityHistoryMonth = [
-  60, 62, 58, 55, 59, 56, 54, 58, 60, 57, 55, 53, 52,
+const PERIODS = [
+  { label: "1h", hours: 1 },
+  { label: "6h", hours: 6 },
+  { label: "24h", hours: 24 },
+  { label: "7d", hours: 168 },
 ];
 
-const airHumidityHistoryDay = [65, 67, 68, 70, 69, 66, 65];
-const airHumidityHistoryWeek = [72, 70, 68, 65, 69, 71, 70];
-const airHumidityHistoryMonth = [
-  75, 73, 68, 66, 70, 72, 74, 71, 69, 68, 67, 66, 65,
-];
-
-// O componente do gráfico de linha
-const LineGraph = ({ data, color, unit }) => {
-  return (
-    <LineChart
-      style={{ height: 200 }}
-      data={data}
-      svg={{ stroke: color, strokeWidth: 2 }}
-      contentInset={{ top: 20, bottom: 20 }}
-      curve={shape.curveNatural}
-    >
-      <Grid svg={{ stroke: "#E5E7EB" }} />
-    </LineChart>
-  );
+const FIELD_MAP = {
+  Temperatura: "temperature",
+  "Umidade do Solo": "soil_humidity",
+  "Umidade do Ar": "air_humidity",
 };
 
-// O componente da página detalhada
+// ─── Componente ──────────────────────────────────────────────────────────────
 const DetailedGraphsPage = ({ type, unit, color, onGoBack }) => {
-  const [timeRange, setTimeRange] = useState("day");
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState(PERIODS[2]); // 24h padrão
+  const [stats, setStats] = useState({
+    min: "—",
+    max: "—",
+    avg: "—",
+    current: "—",
+  });
 
-  const getHistoryData = () => {
-    switch (type) {
-      case "Temperatura":
-        switch (timeRange) {
-          case "day":
-            return tempHistoryDay;
-          case "week":
-            return tempHistoryWeek;
-          case "month":
-            return tempHistoryMonth;
-          default:
-            return [];
-        }
-      case "Umidade do Solo":
-        switch (timeRange) {
-          case "day":
-            return soilHumidityHistoryDay;
-          case "week":
-            return soilHumidityHistoryWeek;
-          case "month":
-            return soilHumidityHistoryMonth;
-          default:
-            return [];
-        }
-      case "Umidade do Ar":
-        switch (timeRange) {
-          case "day":
-            return airHumidityHistoryDay;
-          case "week":
-            return airHumidityHistoryWeek;
-          case "month":
-            return airHumidityHistoryMonth;
-          default:
-            return [];
-        }
-      default:
-        return [];
+  const field = FIELD_MAP[type];
+
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await dynamoDBService.getSensorHistory(
+        "pivot_001",
+        period.hours,
+      );
+      setHistory(data);
+      const vals = data.map((d) => d[field]).filter((v) => v != null);
+      if (vals.length > 0) {
+        setStats({
+          current: vals.at(-1).toFixed(1),
+          min: Math.min(...vals).toFixed(1),
+          max: Math.max(...vals).toFixed(1),
+          avg: (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1),
+        });
+      }
+    } catch (e) {
+      console.error("[Chart] Erro ao carregar histórico:", e);
+    } finally {
+      setLoading(false);
     }
+  }, [period, field]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  // Amostra até 20 pontos para o gráfico
+  const buildChartData = () => {
+    if (history.length === 0) return null;
+    const step = Math.max(1, Math.floor(history.length / 20));
+    const sampled = history.filter((_, i) => i % step === 0).slice(-20);
+    return {
+      labels: sampled.map(({ timestamp }) => {
+        const d = new Date(timestamp);
+        return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+      }),
+      datasets: [{ data: sampled.map((d) => d[field] ?? 0), strokeWidth: 2 }],
+    };
   };
 
-  const historyData = getHistoryData();
-  const yMin = Math.min(...historyData);
-  const yMax = Math.max(...historyData);
+  const chartData = buildChartData();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F0F2F5" }}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Voltar</Text>
+    <SafeAreaView style={styles.safe}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onGoBack} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>{type}</Text>
+        <TouchableOpacity onPress={loadHistory} style={styles.refreshBtn}>
+          <Ionicons name="refresh-outline" size={22} color="#374151" />
+        </TouchableOpacity>
+      </View>
 
-        <Text style={styles.title}>{type} Detalhada</Text>
-
-        <View style={styles.rangeButtons}>
-          <TouchableOpacity
-            onPress={() => setTimeRange("day")}
-            style={[
-              styles.rangeButton,
-              timeRange === "day" && styles.activeRangeButton,
-            ]}
-          >
-            <Text
-              style={[
-                styles.rangeButtonText,
-                timeRange === "day" && styles.activeRangeButtonText,
-              ]}
-            >
-              Dia
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Valor atual em destaque */}
+        <View style={[styles.heroCard, { borderLeftColor: color }]}>
+          <View>
+            <Text style={styles.heroLabel}>Valor Atual</Text>
+            <Text style={[styles.heroValue, { color }]}>
+              {stats.current}
+              {unit}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTimeRange("week")}
-            style={[
-              styles.rangeButton,
-              timeRange === "week" && styles.activeRangeButton,
-            ]}
-          >
-            <Text
-              style={[
-                styles.rangeButtonText,
-                timeRange === "week" && styles.activeRangeButtonText,
-              ]}
-            >
-              Semana
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTimeRange("month")}
-            style={[
-              styles.rangeButton,
-              timeRange === "month" && styles.activeRangeButton,
-            ]}
-          >
-            <Text
-              style={[
-                styles.rangeButtonText,
-                timeRange === "month" && styles.activeRangeButtonText,
-              ]}
-            >
-              Mês
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.metricSummary}>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Atual</Text>
-            <Text
-              style={[styles.metricValue, { color: color }]}
-            >{`${currentValue}${unit}`}</Text>
           </View>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Mínimo</Text>
-            <Text
-              style={[styles.metricValue, { color: "#EF4444" }]}
-            >{`${yMin}${unit}`}</Text>
-          </View>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Máximo</Text>
-            <Text
-              style={[styles.metricValue, { color: "#3B82F6" }]}
-            >{`${yMax}${unit}`}</Text>
+          <View style={[styles.heroIcon, { backgroundColor: color + "20" }]}>
+            <Ionicons
+              name={type === "Temperatura" ? "thermometer" : "water"}
+              size={32}
+              color={color}
+            />
           </View>
         </View>
 
+        {/* Mini stats: min / média / max */}
+        <View style={styles.statsRow}>
+          {[
+            { label: "Mínimo", value: stats.min },
+            { label: "Média", value: stats.avg },
+            { label: "Máximo", value: stats.max },
+          ].map(({ label, value }) => (
+            <View key={label} style={styles.statCard}>
+              <Text style={styles.statLabel}>{label}</Text>
+              <Text style={[styles.statValue, { color }]}>
+                {value}
+                {unit}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Seletor de período */}
+        <View style={styles.periodRow}>
+          {PERIODS.map((p) => (
+            <TouchableOpacity
+              key={p.label}
+              style={[
+                styles.periodBtn,
+                period.label === p.label && { backgroundColor: color },
+              ]}
+              onPress={() => setPeriod(p)}
+            >
+              <Text
+                style={[
+                  styles.periodTxt,
+                  period.label === p.label && styles.periodTxtActive,
+                ]}
+              >
+                {p.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Gráfico */}
         <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>Gráfico de Histórico</Text>
-          <LineGraph data={historyData} color={color} unit={unit} />
+          <Text style={styles.chartTitle}>
+            Histórico — últimas {period.label}
+          </Text>
+
+          {loading ? (
+            <ActivityIndicator
+              size="large"
+              color={color}
+              style={{ marginVertical: 50 }}
+            />
+          ) : chartData ? (
+            <LineChart
+              data={chartData}
+              width={width - 48}
+              height={230}
+              withDots={history.length < 25}
+              bezier
+              chartConfig={{
+                backgroundColor: "#ffffff",
+                backgroundGradientFrom: "#ffffff",
+                backgroundGradientTo: "#f9fafb",
+                decimalPlaces: 1,
+                color: (opacity = 1) =>
+                  `${color}${Math.round(opacity * 255)
+                    .toString(16)
+                    .padStart(2, "0")}`,
+                labelColor: () => "#9CA3AF",
+                propsForDots: { r: "4", strokeWidth: "2", stroke: color },
+                propsForBackgroundLines: {
+                  stroke: "#F3F4F6",
+                  strokeDasharray: "",
+                },
+              }}
+              style={styles.chart}
+            />
+          ) : (
+            <View style={styles.noData}>
+              <Ionicons name="bar-chart-outline" size={44} color="#D1D5DB" />
+              <Text style={styles.noDataText}>Sem dados para este período</Text>
+              <Text style={styles.noDataSub}>
+                Os dados aparecerão conforme os sensores enviam leituras
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    padding: 15,
-  },
-  backButton: {
-    marginBottom: 10,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: "#4B5563",
-    fontWeight: "bold",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#1F2937",
-    marginBottom: 20,
-  },
-  rangeButtons: {
+  safe: { flex: 1, backgroundColor: "#F0F2F5" },
+  header: {
     flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  rangeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: "#E5E7EB",
-    marginHorizontal: 5,
-  },
-  rangeButtonText: {
-    color: "#4B5563",
-  },
-  activeRangeButton: {
-    backgroundColor: "#22C55E",
-  },
-  activeRangeButtonText: {
-    color: "#FFFFFF",
-  },
-  metricSummary: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
   },
-  metricBox: {
+  backBtn: { padding: 6 },
+  refreshBtn: { padding: 6 },
+  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#111827" },
+  content: { padding: 16 },
+
+  heroCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 20,
+    marginBottom: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderLeftWidth: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  heroLabel: { fontSize: 13, color: "#6B7280", marginBottom: 4 },
+  heroValue: { fontSize: 42, fontWeight: "bold" },
+  heroIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: "center",
     alignItems: "center",
   },
-  metricLabel: {
-    fontSize: 12,
-    color: "#6B7280",
+
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
   },
-  metricValue: {
-    fontSize: 20,
-    fontWeight: "bold",
+  statCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+    marginHorizontal: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
   },
+  statLabel: { fontSize: 11, color: "#9CA3AF", marginBottom: 4 },
+  statValue: { fontSize: 18, fontWeight: "bold" },
+
+  periodRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  periodBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#E5E7EB",
+  },
+  periodTxt: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  periodTxtActive: { color: "#FFFFFF" },
+
   chartCard: {
     backgroundColor: "#FFFFFF",
-    padding: 15,
-    borderRadius: 12,
+    borderRadius: 14,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  chartTitle: {
+  chartTitle: { fontSize: 13, color: "#6B7280", marginBottom: 12 },
+  chart: { borderRadius: 10, marginLeft: -12 },
+
+  noData: { alignItems: "center", paddingVertical: 40 },
+  noDataText: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#1F2937",
-    marginBottom: 10,
+    fontWeight: "600",
+    color: "#9CA3AF",
+    marginTop: 12,
+  },
+  noDataSub: {
+    fontSize: 12,
+    color: "#D1D5DB",
+    textAlign: "center",
+    marginTop: 6,
   },
 });
 
