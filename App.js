@@ -4,10 +4,8 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   TouchableOpacity,
-  Platform,
   StatusBar,
 } from "react-native";
 import {
@@ -28,15 +26,12 @@ import { dynamoDBService } from "./services/dynamoDBService";
 
 configureAWS();
 
-const PIVOT_ID = "pivot_001";
-const WS_URL =
-  process.env.EXPO_PUBLIC_WEBSOCKET_URL || "ws://192.168.137.72:80/ws";
-
 // ─── Tela de Configuração ─────────────────────────────────────────────────────
 const ConfigPage = ({
   pivotData,
   isConnected,
   onGoBack,
+  onToggleRotation,
   onChangePower,
   onChangeFlow,
   onChangeUVIntensity,
@@ -63,7 +58,7 @@ const ConfigPage = ({
           uvLightStatus={pivotData?.status?.uv_light_status}
           waterFlow={pivotData?.status?.water_flow ?? 0}
           uvIntensity={pivotData?.status?.uv_intensity ?? 0}
-          onToggleRotation={() => {}}
+          onToggleRotation={onToggleRotation}
           onToggleDirection={onToggleDirection}
           onChangePower={onChangePower}
           onToggleUVLight={onToggleUVLight}
@@ -96,169 +91,219 @@ const configStyles = StyleSheet.create({
 const App = () => {
   const insets = useSafeAreaInsets();
   const [pivotData, setPivotData] = useState(null);
+  const [pivotId, setPivotId] = useState(null);
   const [view, setView] = useState("home");
   const [isConnected, setIsConnected] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
-  const [reconnectTimer, setReconnectTimer] = useState(0);
 
-  const ws = useRef(null);
   const iotSub = useRef(null);
-  const countdownRef = useRef(null);
+  const discoverySub = useRef(null);
+  const lastMessageRef = useRef(Date.now());
 
+  // ── Carga inicial do DynamoDB ─────────────────────────────────────────────
   useEffect(() => {
     dynamoDBService
-      .getPivotData(PIVOT_ID)
+      .getPivotData(pivotId || "pivot_001")
       .then(setPivotData)
       .catch(() => setPivotData(buildDefaultData()));
-  }, []);
+  }, [pivotId]);
 
-  useEffect(() => {
-    iotSub.current = iotService.subscribe(handleIoTMessage, () => {});
-    return () => iotSub.current?.unsubscribe();
-  }, []);
+  // ── Handler de mensagens MQTT ─────────────────────────────────────────────
+  const handleIoTMessage = useCallback(
+    (msg) => {
+      lastMessageRef.current = Date.now();
 
-  const handleIoTMessage = useCallback((msg) => {
-    if (msg.ang !== undefined) setCurrentAngle(parseFloat(msg.ang));
-    const patch = {};
-    if (msg.temp !== undefined) patch.temperature = parseFloat(msg.temp);
-    if (msg.umid !== undefined) patch.air_humidity = parseFloat(msg.umid);
-    if (msg.solo !== undefined) patch.soil_humidity = parseFloat(msg.solo);
-    if (Object.keys(patch).length > 0) {
-      setPivotData((p) =>
-        p ? { ...p, sensors: { ...p.sensors, ...patch } } : p,
-      );
-      dynamoDBService.saveSensorReading(PIVOT_ID, patch).catch(console.error);
-    }
-    if (msg.status)
-      setPivotData((p) =>
-        p ? { ...p, status: { ...p.status, ...msg.status } } : p,
-      );
-  }, []);
-
-  useEffect(() => {
-    const connect = () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      setReconnectTimer(0);
-
-      console.log("[WS] Tentando conexão com", WS_URL);
-
-      ws.current = new WebSocket(WS_URL);
-
-      ws.current.onopen = () => {
+      if (msg.id && !pivotId) {
+        console.log("[App] 🎯 Pivô identificado:", msg.id);
+        setPivotId(msg.id);
         setIsConnected(true);
-        console.log("[WS] ✅ Conectado ao ESP32!");
-      };
+        return;
+      }
 
-      ws.current.onmessage = ({ data }) => {
-        try {
-          const msg = JSON.parse(data);
-          console.log("[WS] 📨 Mensagem recebida:", msg);
-          handleIoTMessage(msg);
-        } catch {}
-      };
+      setIsConnected(true);
 
-      ws.current.onerror = (e) => {
-        console.log("[WS] ❌ Erro de conexão:", e.message);
-      };
+      if (msg.ang !== undefined) setCurrentAngle(parseFloat(msg.ang));
 
-      ws.current.onclose = () => {
-        setIsConnected(false);
-        console.log("[WS] 🔌 Desconectado do ESP32.");
+      const patch = {};
+      if (msg.temp !== undefined) patch.temperature = parseFloat(msg.temp);
+      if (msg.umid !== undefined) patch.air_humidity = parseFloat(msg.umid);
+      if (msg.solo !== undefined) patch.soil_humidity = parseFloat(msg.solo);
 
-        let t = 3;
-        setReconnectTimer(t);
-        console.log(`[WS] 🔄 Reconectando em ${t}s...`);
+      if (Object.keys(patch).length > 0) {
+        setPivotData((p) =>
+          p ? { ...p, sensors: { ...p.sensors, ...patch } } : p,
+        );
+        dynamoDBService
+          .saveSensorReading(pivotId || "pivot_001", patch)
+          .catch(console.error);
+      }
 
-        countdownRef.current = setInterval(() => {
-          t--;
-          setReconnectTimer(t);
-          if (t > 0) {
-            console.log(`[WS] 🔄 Reconectando em ${t}s...`);
-          } else {
-            clearInterval(countdownRef.current);
-            console.log("[WS] 🔃 Tentando reconexão agora...");
-            connect();
+      if (msg.status) {
+        setPivotData((p) =>
+          p ? { ...p, status: { ...p.status, ...msg.status } } : p,
+        );
+      }
+    },
+    [pivotId],
+  );
+
+  // ── Discovery: escuta pivot/# até encontrar um pivô ──────────────────────
+  useEffect(() => {
+    console.log("[App] 🔍 Iniciando descoberta de pivôs...");
+    try {
+      discoverySub.current = iotService.discover(
+        (msg) => {
+          if (!pivotId) {
+            setPivotId(msg.id);
+            setIsConnected(true);
+            handleIoTMessage(msg);
           }
-        }, 1000);
-      };
-    };
-
-    connect();
+        },
+        (err) => {
+          // NÃO seta offline aqui — pode ser o discovery sendo cancelado normalmente
+          console.warn("[App] ⚠️ Discovery encerrado:", err?.message || err);
+        },
+      );
+    } catch (err) {
+      console.error("[App] ❌ Falha ao iniciar discovery:", err);
+    }
     return () => {
-      ws.current?.close();
-      clearInterval(countdownRef.current);
+      if (discoverySub.current?.unsubscribe) discoverySub.current.unsubscribe();
     };
   }, []);
 
-  const sendWS = useCallback((cmd) => {
-    if (ws.current?.readyState === WebSocket.OPEN) ws.current.send(cmd);
-  }, []);
+  // ── Subscription específica após descobrir o pivô ─────────────────────────
+  useEffect(() => {
+    if (!pivotId) return;
+    console.log(`[App] 📡 Inscrevendo nos tópicos do pivô: ${pivotId}`);
+    if (discoverySub.current?.unsubscribe) discoverySub.current.unsubscribe();
 
-  const patchStatus = useCallback((patch) => {
-    setPivotData((p) => {
-      if (!p) return p;
-      const merged = { ...p.status, ...patch };
-      dynamoDBService.updateStatus(PIVOT_ID, merged).catch(console.error);
-      return { ...p, status: merged };
-    });
-  }, []);
+    try {
+      iotSub.current = iotService.subscribe(
+        pivotId,
+        handleIoTMessage,
+        (err) => {
+          setIsConnected(false);
+          console.warn(
+            "[App] ⚠️ Conexão MQTT interrompida:",
+            err?.message || err,
+          );
+        },
+      );
+    } catch (err) {
+      console.error("[App] ❌ Erro ao inscrever nos tópicos:", err);
+    }
 
+    return () => {
+      if (iotSub.current?.unsubscribe) iotSub.current.unsubscribe();
+    };
+  }, [pivotId]);
+
+  // ── Heartbeat: detecta quando o pivô para de enviar dados ────────────────
+  useEffect(() => {
+    const TIMEOUT = 90_000; // 90s sem mensagem = offline
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - lastMessageRef.current;
+      if (elapsed > TIMEOUT && isConnected) {
+        console.warn(
+          `[App] ⏱️ Sem mensagens há ${Math.round(elapsed / 1000)}s → Offline`,
+        );
+        setIsConnected(false);
+      }
+    }, 15_000); // checa a cada 15s
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const sendCommandViaMQTT = useCallback(
+    (cmd, val = null) => {
+      const message = val !== null ? { cmd, val } : { cmd };
+      console.log(`[App] 📤 Enviando para ${pivotId}:`, message);
+      iotService.sendCommand(pivotId || "pivot_001", message);
+    },
+    [pivotId],
+  );
+
+  const patchStatus = useCallback(
+    (patch) => {
+      setPivotData((p) => {
+        if (!p) return p;
+        const merged = { ...p.status, ...patch };
+        dynamoDBService
+          .updateStatus(pivotId || "pivot_001", merged)
+          .catch(console.error);
+        return { ...p, status: merged };
+      });
+    },
+    [pivotId],
+  );
+
+  // ── Handlers das Ações ────────────────────────────────────────────────────
   const handleToggleRotation = useCallback(() => {
     if (!pivotData || !isConnected) return;
     const next =
       pivotData.status.rotation_status === "Rodando" ? "Parado" : "Rodando";
-    sendWS(next === "Rodando" ? "ON" : "OFF");
+    sendCommandViaMQTT(next === "Rodando" ? "ON" : "OFF");
     patchStatus({ rotation_status: next });
-  }, [pivotData, isConnected]);
+  }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
 
   const handleToggleDirection = useCallback(() => {
     if (!pivotData || !isConnected) return;
-    const next =
-      pivotData.status.direction === "Horário" ? "Anti-horário" : "Horário";
-    sendWS(next === "Anti-horário" ? "ANT" : "HOR");
-    patchStatus({ direction: next });
-  }, [pivotData, isConnected]);
+    const currentPower = Math.abs(pivotData.status.power || 50);
+    const isAntiClockwise = pivotData.status.direction === "Horário";
+    const newVal = isAntiClockwise ? -currentPower : currentPower;
+    const next = isAntiClockwise ? "Anti-horário" : "Horário";
+    sendCommandViaMQTT("VEL", newVal);
+    patchStatus({ direction: next, power: currentPower });
+  }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
 
   const handleChangePower = useCallback(
     (v) => {
-      sendWS(parseInt(v).toString());
-      patchStatus({ power: parseInt(v) });
+      const power = parseInt(v);
+      const isAntiClockwise = pivotData?.status?.direction === "Anti-horário";
+      const val = isAntiClockwise ? -Math.abs(power) : Math.abs(power);
+      sendCommandViaMQTT("VEL", val);
+      patchStatus({ power: Math.abs(power) });
     },
-    [isConnected],
+    [pivotData, isConnected, sendCommandViaMQTT, patchStatus],
   );
+
   const handleChangeFlow = useCallback(
     (v) => {
       const f = Math.round(v);
-      sendWS(`B=${f}`);
+      sendCommandViaMQTT("BOMBA", f);
       patchStatus({
         water_flow: f,
         water_pump_status: f > 0 ? "Ligada" : "Desligada",
       });
     },
-    [isConnected],
+    [isConnected, sendCommandViaMQTT, patchStatus],
   );
+
   const handleChangeUVIntensity = useCallback(
     (v) => {
       const i = Math.round(v);
-      sendWS(`L=${i}`);
+      sendCommandViaMQTT("LED", i);
       patchStatus({
         uv_intensity: i,
         uv_light_status: i > 0 ? "Ligada" : "Desligada",
       });
     },
-    [isConnected],
+    [isConnected, sendCommandViaMQTT, patchStatus],
   );
+
   const handleToggleUVLight = useCallback(() => {
     const on = pivotData?.status?.uv_light_status !== "Ligada";
-    sendWS(on ? "L=100" : "L=0");
+    sendCommandViaMQTT("LED", on ? 100 : 0);
     patchStatus({
       uv_light_status: on ? "Ligada" : "Desligada",
       uv_intensity: on ? 100 : 0,
     });
-  }, [pivotData, isConnected]);
+  }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
+
   const handleZeroPosition = useCallback(() => {
-    if (isConnected) sendWS("ZERAR");
-  }, [isConnected]);
+    if (isConnected) sendCommandViaMQTT("ZERAR");
+  }, [isConnected, sendCommandViaMQTT]);
 
   const handleToggleSector = useCallback(
     (key) => {
@@ -269,7 +314,6 @@ const App = () => {
       )
         return;
       const newActive = !pivotData.sectors[key].is_active;
-      sendWS(`S${key.replace("sector_", "")}=${newActive ? 1 : 0}`);
       setPivotData((p) => {
         if (!p) return p;
         const sectors = {
@@ -277,14 +321,15 @@ const App = () => {
           [key]: { ...p.sectors[key], is_active: newActive },
         };
         dynamoDBService
-          .updateStatus(PIVOT_ID, { ...p.status, sectors })
+          .updateStatus(pivotId || "pivot_001", { ...p.status, sectors })
           .catch(console.error);
         return { ...p, sectors };
       });
     },
-    [pivotData, isConnected],
+    [pivotData, isConnected, pivotId],
   );
 
+  // ── Render ────────────────────────────────────────────────────────────────
   if (!pivotData) {
     return (
       <View style={[styles.loading, { paddingTop: insets.top }]}>
@@ -294,15 +339,16 @@ const App = () => {
     );
   }
 
-  // ── Sub-telas ──
   if (view === "schedule")
     return <SchedulePage onGoBack={() => setView("home")} />;
+
   if (view === "config")
     return (
       <ConfigPage
         pivotData={pivotData}
         isConnected={isConnected}
         onGoBack={() => setView("home")}
+        onToggleRotation={handleToggleRotation}
         onChangePower={handleChangePower}
         onChangeFlow={handleChangeFlow}
         onChangeUVIntensity={handleChangeUVIntensity}
@@ -331,11 +377,13 @@ const App = () => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F0F2F5" />
       <ScrollView contentContainerStyle={styles.content}>
-        {/* ── Header ── */}
+        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>🌾 Pivô Tec</Text>
-            <Text style={styles.headerSub}>Painel de Controle</Text>
+            <Text style={styles.headerSub}>
+              {pivotId ? `ID: ${pivotId}` : "Aguardando pivô..."}
+            </Text>
           </View>
           <View
             style={[
@@ -357,7 +405,18 @@ const App = () => {
           </View>
         </View>
 
-        {/* ── Visualização + botão ligar/desligar ── */}
+        {/* Card aguardando pivô */}
+        {!pivotId && (
+          <View style={styles.waitingCard}>
+            <Text style={styles.waitingIcon}>📡</Text>
+            <Text style={styles.waitingTitle}>Aguardando conexão</Text>
+            <Text style={styles.waitingSub}>
+              Ligue o pivô e aguarde a conexão via MQTT
+            </Text>
+          </View>
+        )}
+
+        {/* Visualização */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Posição do Pivô</Text>
@@ -367,8 +426,6 @@ const App = () => {
             angle={currentAngle}
             sectors={pivotData.sectors}
           />
-
-          {/* Botão principal de rotação */}
           <TouchableOpacity
             style={[
               styles.rotateBtn,
@@ -386,31 +443,43 @@ const App = () => {
                   : styles.rotateBtnTextStart,
               ]}
             >
-              {isRotating ? "⏸  Parar Rotação" : "▶  Iniciar Rotação"}
+              {isRotating ? "⏸   Parar Rotação" : "▶   Iniciar Rotação"}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ── Métricas ── */}
+        {/* Métricas */}
         <View style={styles.metricsRow}>
           <MetricCard
-            value={`${pivotData.sensors.temperature}°C`}
+            value={
+              pivotData.sensors?.temperature !== undefined
+                ? `${pivotData.sensors.temperature}°C`
+                : "--°C"
+            }
             label="Temperatura"
             onClick={() => setView("temp")}
           />
           <MetricCard
-            value={`${pivotData.sensors.soil_humidity}%`}
+            value={
+              pivotData.sensors?.soil_humidity !== undefined
+                ? `${pivotData.sensors.soil_humidity}%`
+                : "--%"
+            }
             label="Umid. Solo"
             onClick={() => setView("soil-humidity")}
           />
           <MetricCard
-            value={`${pivotData.sensors.air_humidity}%`}
+            value={
+              pivotData.sensors?.air_humidity !== undefined
+                ? `${pivotData.sensors.air_humidity}%`
+                : "--%"
+            }
             label="Umid. Ar"
             onClick={() => setView("air-humidity")}
           />
         </View>
 
-        {/* ── Ações rápidas ── */}
+        {/* Ações rápidas */}
         <View style={styles.actionsRow}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnBlue]}
@@ -428,14 +497,12 @@ const App = () => {
           </TouchableOpacity>
         </View>
 
-        {/* ── Setores ── */}
+        {/* Setores */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Status dos Setores</Text>
           {!isConnected && (
             <Text style={styles.reconnectText}>
-              {reconnectTimer > 0
-                ? `Reconectando em ${reconnectTimer}s…`
-                : "Conectando…"}
+              Conectando ao barramento MQTT…
             </Text>
           )}
           {Object.keys(pivotData.sectors)
@@ -515,6 +582,27 @@ const styles = StyleSheet.create({
   dotOff: { backgroundColor: "#EF4444" },
   badgeText: { fontSize: 12, fontWeight: "600" },
 
+  waitingCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 30,
+    alignItems: "center",
+    marginBottom: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  waitingIcon: { fontSize: 40, marginBottom: 10 },
+  waitingTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#374151",
+    marginBottom: 6,
+  },
+  waitingSub: { fontSize: 13, color: "#9CA3AF", textAlign: "center" },
+
   card: {
     backgroundColor: "#FFF",
     padding: 16,
@@ -565,8 +653,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 14,
     gap: 8,
+    width: "100%",
   },
-
   actionsRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
   actionBtn: {
     flex: 1,
