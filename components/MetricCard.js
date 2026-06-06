@@ -1,42 +1,29 @@
 import React from "react";
-import { TouchableOpacity, Text, StyleSheet } from "react-native";
+import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { theme } from "../theme";
 
-const MetricCard = ({ value, label, onClick }) => {
+const MetricCard = ({ value, label, onClick, icon = "analytics", accent = theme.primary }) => {
   return (
-    <TouchableOpacity style={styles.card} onPress={onClick} activeOpacity={0.7}>
-      <Text style={styles.valueText}>{value}</Text>
-      <Text style={styles.labelText}>{label}</Text>
+    <TouchableOpacity onPress={onClick} style={styles.card} activeOpacity={0.8}>
+      <View style={[styles.iconWrap, { backgroundColor: accent + "22" }]}>
+        <Ionicons name={icon} size={18} color={accent} />
+      </View>
+      <Text style={[styles.value, { color: accent }]}>{value}</Text>
+      <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1, // 🌟 ISSO AQUI É O SEGREDO: força os 3 cards a dividirem o espaço igualmente!
-    backgroundColor: "#FFF",
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    // Seus estilos de sombra atuais...
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    flexGrow: 1, flexBasis: "30%", minWidth: 90,
+    backgroundColor: theme.bgCard, borderWidth: 1, borderColor: theme.border,
+    padding: 14, borderRadius: 16, alignItems: "flex-start",
   },
-  valueText: {
-    fontSize: 18, // Um tamanho bom para caber mesmo em telas menores
-    fontWeight: "bold",
-    color: "#10B981", // Cor verde que você está usando
-    marginBottom: 4,
-  },
-  labelText: {
-    fontSize: 12,
-    color: "#6B7280",
-    fontWeight: "500",
-  },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  value: { fontSize: 20, fontWeight: "bold" },
+  label: { fontSize: 11, color: theme.textMuted, marginTop: 2 },
 });
 
 export default MetricCard;

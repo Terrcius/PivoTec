@@ -1,44 +1,23 @@
-// components/StatusCard.js
-
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { theme } from "../theme";
 
-// 1. Adicionamos a nova prop 'isAdjustable'
-const StatusCard = ({
-  color,
-  label,
-  value,
-  status,
-  onToggle,
-  isAdjustable,
-}) => {
+const StatusCard = ({ color, label, value, status, onToggle, isAdjustable }) => {
   return (
-    // 2. Adicionamos um estilo que aplica opacidade se não for ajustável
-    <View style={[styles.card, !isAdjustable && styles.disabledCard]}>
-      <View style={styles.labelContainer}>
-        <View style={[styles.statusCircle, { backgroundColor: color }]}></View>
-        <Text style={styles.labelText}>{label}</Text>
+    <View style={[styles.card, !isAdjustable && styles.disabled]}>
+      <View style={styles.left}>
+        <View style={[styles.dot, { backgroundColor: color }]} />
+        <Text style={styles.label}>{label}</Text>
       </View>
-
-      <View style={styles.controlContainer}>
-        <Text style={styles.valueText}>{value}</Text>
-
+      <View style={styles.right}>
+        <Text style={styles.value}>{value}</Text>
         <TouchableOpacity
           onPress={onToggle}
-          style={[
-            styles.toggleButton,
-            { backgroundColor: status ? "#22C55E" : "#9CA3AF" },
-          ]}
+          style={[styles.toggle, { backgroundColor: status ? theme.primary : "#3A4F44" }]}
           activeOpacity={0.7}
-          // 3. Adicionamos a propriedade 'disabled' para bloquear o toque
           disabled={!isAdjustable}
         >
-          <View
-            style={[
-              styles.toggleBall,
-              status ? styles.toggleOn : styles.toggleOff,
-            ]}
-          ></View>
+          <View style={[styles.ball, status ? styles.on : styles.off]} />
         </TouchableOpacity>
       </View>
     </View>
@@ -47,61 +26,20 @@ const StatusCard = ({
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F9FAFB",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: theme.bgCardAlt, padding: 14, borderRadius: 12, marginBottom: 8,
+    borderWidth: 1, borderColor: theme.border,
   },
-  // 4. Novo estilo para o feedback visual de desabilitado
-  disabledCard: {
-    opacity: 0.5,
-  },
-  labelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  statusCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  labelText: {
-    fontWeight: "500",
-    fontSize: 14,
-    color: "#374151",
-  },
-  controlContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  valueText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
-  toggleButton: {
-    width: 40,
-    height: 24,
-    borderRadius: 20,
-    justifyContent: "center",
-  },
-  toggleBall: {
-    width: 16,
-    height: 16,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-  },
-  toggleOn: {
-    transform: [{ translateX: 19 }],
-  },
-  toggleOff: {
-    transform: [{ translateX: 4 }],
-  },
+  disabled: { opacity: 0.5 },
+  left:  { flexDirection: "row", alignItems: "center", gap: 12 },
+  dot:   { width: 10, height: 10, borderRadius: 5 },
+  label: { fontWeight: "500", fontSize: 14, color: theme.text },
+  right: { flexDirection: "row", alignItems: "center", gap: 12 },
+  value: { fontSize: 14, fontWeight: "600", color: theme.textMuted },
+  toggle:{ width: 42, height: 24, borderRadius: 20, justifyContent: "center" },
+  ball:  { width: 18, height: 18, borderRadius: 10, backgroundColor: "#FFF" },
+  on:    { transform: [{ translateX: 20 }] },
+  off:   { transform: [{ translateX: 3 }] },
 });
 
 export default StatusCard;
