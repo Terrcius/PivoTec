@@ -203,6 +203,22 @@ export const dynamoDBService = {
     }
   },
 
+  updateSectors: async (pivotId = "pivot_001", sectorsData) => {
+    try {
+      await dynamoRequest("PutItem", {
+        TableName: TABLES.PIVOT_DATA,
+        Item: {
+          pivotId: { S: pivotId },
+          dataType: { S: "sectors" },
+          data: marshal(sectorsData),
+          updatedAt: { N: Date.now().toString() },
+        },
+      });
+    } catch (e) {
+      console.error("[DynamoDB] updateSectors:", e);
+    }
+  },
+
   saveSensorReading: async (pivotId = "pivot_001", sensors) => {
     try {
       const now = Date.now();
@@ -254,7 +270,7 @@ export const dynamoDBService = {
         KeyConditionExpression: "pivotId = :id",
         ExpressionAttributeValues: { ":id": { S: pivotId } },
       });
-      
+
       // Ajuste: Passando o item envelopado em { M: item } para o unmarshal decodificar perfeitamente
       return (result.Items || []).map((item) => unmarshal({ M: item }));
     } catch (e) {

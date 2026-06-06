@@ -9,13 +9,14 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons, Feather, Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
+import { theme } from "../theme";
 
 // ─── Botão animado (escala no press) ────────────────────────────────────────
 const AnimatedButton = ({ onPress, disabled, style, children }) => {
   const scale = useRef(new Animated.Value(1)).current;
 
   const onIn = () =>
-    Animated.spring(scale, { toValue: 0.93, useNativeDriver: true }).start();
+    Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
   const onOut = () =>
     Animated.spring(scale, {
       toValue: 1.0,
@@ -37,6 +38,48 @@ const AnimatedButton = ({ onPress, disabled, style, children }) => {
         {children}
       </TouchableOpacity>
     </Animated.View>
+  );
+};
+
+// ─── Botão de grade (ícone + título + subtítulo) ─────────────────────────────
+const GridButton = ({
+  icon,
+  title,
+  subtitle,
+  active,
+  disabled,
+  variant, // "start" | "stop" | "secondary"
+  accent, // cor do ícone/título quando ativo
+}) => {
+  const stop = variant === "stop";
+  const start = variant === "start";
+
+  return (
+    <View
+      style={[
+        styles.gridBtn,
+        stop && styles.gridBtnStop,
+        start && styles.gridBtnStart,
+        active && !stop && styles.gridBtnActive,
+        disabled && styles.gridBtnDisabled,
+      ]}
+    >
+      {icon}
+      <Text
+        style={[
+          styles.gridTitle,
+          stop && { color: "#FFFFFF" },
+          active && accent ? { color: accent } : null,
+        ]}
+      >
+        {title}
+      </Text>
+      <Text
+        style={[styles.gridSub, stop && { color: "rgba(255,255,255,0.8)" }]}
+      >
+        {subtitle}
+      </Text>
+    </View>
   );
 };
 
@@ -76,7 +119,7 @@ const MainControls = ({
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.06,
+            toValue: 1.04,
             duration: 700,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
@@ -95,51 +138,18 @@ const MainControls = ({
     }
   }, [isRotating]);
 
-  // Animação do ponto de conexão (pisca quando desconectado)
-  const blinkAnim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (!isConnected) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(blinkAnim, {
-            toValue: 0.2,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-          Animated.timing(blinkAnim, {
-            toValue: 1.0,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ]),
-      ).start();
-    } else {
-      blinkAnim.stopAnimation();
-      blinkAnim.setValue(1);
-    }
-  }, [isConnected]);
+  const iconColor = (activeColor, on) =>
+    !isConnected ? theme.textFaint : on ? activeColor : theme.textMuted;
 
   return (
     <View style={styles.card}>
       <View style={styles.cardHeaderRow}>
         <Text style={styles.cardTitle}>Controle Principal</Text>
-        <View style={styles.connRow}>
-          <Animated.View
-            style={[
-              styles.connDot,
-              isConnected ? styles.connDotOn : styles.connDotOff,
-              { opacity: isConnected ? 1 : blinkAnim },
-            ]}
-          />
-          <Text
-            style={[
-              styles.connText,
-              isConnected ? styles.connTextOn : styles.connTextOff,
-            ]}
-          >
-            {isConnected ? "Conectado" : "Offline"}
-          </Text>
-        </View>
+        <Text
+          style={[styles.statusText, isRotating && { color: theme.primary }]}
+        >
+          {isRotating ? "Rodando" : "Parado"}
+        </Text>
       </View>
 
       {/* ── LINHA 1: Rotação + Direção ── */}
@@ -147,67 +157,53 @@ const MainControls = ({
         {/* Botão de rotação com pulso */}
         <Animated.View style={[{ flex: 1, transform: [{ scale: pulseAnim }] }]}>
           <TouchableOpacity
-            style={[
-              styles.btn,
-              isRotating ? styles.btnStop : styles.btnStart,
-              !isConnected && styles.btnDisabled,
-            ]}
             onPress={onToggleRotation}
             disabled={!isConnected}
             activeOpacity={0.85}
           >
-            <Ionicons
-              name={isRotating ? "pause-circle" : "play-circle"}
-              size={26}
-              color={
-                isRotating ? "#FFFFFF" : isConnected ? "#10B981" : "#A1A1AA"
+            <GridButton
+              variant={isRotating ? "stop" : "start"}
+              disabled={!isConnected}
+              icon={
+                <Ionicons
+                  name={isRotating ? "pause" : "play"}
+                  size={26}
+                  color={
+                    isRotating
+                      ? "#FFFFFF"
+                      : isConnected
+                        ? theme.primary
+                        : theme.textFaint
+                  }
+                />
               }
+              title={isRotating ? "Parar" : "Iniciar"}
+              subtitle="Rotação"
             />
-            <Text
-              style={[
-                styles.btnTxt,
-                isRotating ? styles.btnTxtStop : styles.btnTxtStart,
-              ]}
-            >
-              {isRotating ? "Parar" : "Iniciar"}
-            </Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Direção */}
         <AnimatedButton
-          style={{ flex: 1, marginLeft: 8 }}
+          style={{ flex: 1, marginLeft: 10 }}
           onPress={onToggleDirection}
           disabled={!isConnected}
         >
-          <View
-            style={[
-              styles.btn,
-              styles.btnSecondary,
-              !isConnected && styles.btnDisabled,
-              isAntiClockwise && isConnected && styles.btnActive,
-            ]}
-          >
-            <Feather
-              name="refresh-cw"
-              size={22}
-              color={
-                isAntiClockwise && isConnected
-                  ? "#3B82F6"
-                  : isConnected
-                    ? "#374151"
-                    : "#A1A1AA"
-              }
-            />
-            <Text
-              style={[
-                styles.btnTxtSec,
-                isAntiClockwise && isConnected && styles.btnTxtActive,
-              ]}
-            >
-              {isAntiClockwise ? "Anti-horário" : "Horário"}
-            </Text>
-          </View>
+          <GridButton
+            variant="secondary"
+            disabled={!isConnected}
+            active={isAntiClockwise}
+            accent={theme.accentBlue}
+            icon={
+              <Feather
+                name="refresh-cw"
+                size={22}
+                color={iconColor(theme.accentBlue, isAntiClockwise)}
+              />
+            }
+            title={isAntiClockwise ? "Anti-horário" : "Horário"}
+            subtitle="Direção"
+          />
         </AnimatedButton>
       </View>
 
@@ -219,64 +215,54 @@ const MainControls = ({
           onPress={onToggleUVLight}
           disabled={!isConnected}
         >
-          <View
-            style={[
-              styles.btn,
-              styles.btnSecondary,
-              !isConnected && styles.btnDisabled,
-              isUVOn && isConnected && styles.btnUVOn,
-            ]}
-          >
-            <MaterialCommunityIcons
-              name={isUVOn ? "sun-wireless" : "weather-sunny-off"}
-              size={24}
-              color={
-                isUVOn && isConnected
-                  ? "#D97706"
-                  : isConnected
-                    ? "#374151"
-                    : "#A1A1AA"
-              }
-            />
-            <Text
-              style={[
-                styles.btnTxtSec,
-                isUVOn && isConnected && styles.btnTxtUV,
-              ]}
-            >
-              UV {isUVOn ? "LIGADA" : "DESLIGADA"}
-            </Text>
-          </View>
+          <GridButton
+            variant="secondary"
+            disabled={!isConnected}
+            active={isUVOn}
+            accent={theme.accentAmber}
+            icon={
+              <MaterialCommunityIcons
+                name={isUVOn ? "white-balance-sunny" : "weather-sunny-off"}
+                size={24}
+                color={iconColor(theme.accentAmber, isUVOn)}
+              />
+            }
+            title={isUVOn ? "Ligada" : "Desligada"}
+            subtitle="Luz UV"
+          />
         </AnimatedButton>
 
         {/* Posição inicial */}
         <AnimatedButton
-          style={{ flex: 1, marginLeft: 8 }}
+          style={{ flex: 1, marginLeft: 10 }}
           onPress={onZeroPosition}
           disabled={!isConnected || isRotating}
         >
-          <View
-            style={[
-              styles.btn,
-              styles.btnSecondary,
-              (!isConnected || isRotating) && styles.btnDisabled,
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="target"
-              size={24}
-              color={!isConnected || isRotating ? "#A1A1AA" : "#374151"}
-            />
-            <Text style={styles.btnTxtSec}>Pos. Inicial</Text>
-          </View>
+          <GridButton
+            variant="secondary"
+            disabled={!isConnected || isRotating}
+            icon={
+              <MaterialCommunityIcons
+                name="target"
+                size={24}
+                color={
+                  !isConnected || isRotating ? theme.textFaint : theme.primary
+                }
+              />
+            }
+            title="Reposicionar"
+            subtitle="Posição Inicial"
+          />
         </AnimatedButton>
       </View>
+
+      <View style={styles.divider} />
 
       {/* ── Sliders ── */}
       <SliderRow
         label="Vazão da Água"
         value={localFlow}
-        tintColor="#3B82F6"
+        tintColor={theme.accentBlue}
         disabled={!isConnected}
         onChange={setLocalFlow}
         onComplete={onChangeFlow}
@@ -285,7 +271,7 @@ const MainControls = ({
       <SliderRow
         label="Intensidade UV"
         value={localUV}
-        tintColor="#F59E0B"
+        tintColor={theme.accentAmber}
         disabled={!isConnected}
         onChange={setLocalUV}
         onComplete={onChangeUVIntensity}
@@ -294,7 +280,7 @@ const MainControls = ({
       <SliderRow
         label="Potência da Rotação"
         value={localPower}
-        tintColor="#EF4444"
+        tintColor={theme.primary}
         disabled={!isConnected}
         onChange={setLocalPower}
         onComplete={onChangePower}
@@ -347,7 +333,7 @@ const SliderRow = ({
         minimumValue={0}
         maximumValue={100}
         minimumTrackTintColor={tintColor}
-        maximumTrackTintColor="#E5E7EB"
+        maximumTrackTintColor={theme.track}
         thumbTintColor={tintColor}
         value={value}
         onValueChange={(v) => {
@@ -364,15 +350,12 @@ const SliderRow = ({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.bgCard,
     padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 4,
+    borderRadius: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   cardHeaderRow: {
     flexDirection: "row",
@@ -380,61 +363,53 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 14,
   },
-  cardTitle: { fontSize: 16, fontWeight: "bold", color: "#111827" },
-  connRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  connDot: { width: 8, height: 8, borderRadius: 4 },
-  connDotOn: { backgroundColor: "#10B981" },
-  connDotOff: { backgroundColor: "#EF4444" },
-  connText: { fontSize: 12, fontWeight: "600" },
-  connTextOn: { color: "#10B981" },
-  connTextOff: { color: "#EF4444" },
+  cardTitle: { fontSize: 16, fontWeight: "bold", color: theme.text },
+  statusText: { fontSize: 13, fontWeight: "600", color: theme.textMuted },
 
   row: { flexDirection: "row", marginBottom: 10 },
 
-  btn: {
-    height: 64,
-    borderRadius: 10,
+  gridBtn: {
+    minHeight: 96,
+    borderRadius: 14,
     justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  btnStart: {
-    backgroundColor: "#D1FAE5",
-    borderWidth: 1.5,
-    borderColor: "#10B981",
-  },
-  btnStop: { backgroundColor: "#EF4444" },
-  btnSecondary: {
-    backgroundColor: "#F3F4F6",
+    alignItems: "flex-start",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: theme.bgCardAlt,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: theme.border,
   },
-  btnDisabled: { backgroundColor: "#F9FAFB", opacity: 0.5 },
-  btnActive: { backgroundColor: "#EFF6FF", borderColor: "#93C5FD" },
-  btnUVOn: { backgroundColor: "#FFFBEB", borderColor: "#FCD34D" },
+  gridBtnStart: {
+    backgroundColor: theme.primarySoft,
+    borderColor: theme.primary,
+  },
+  gridBtnStop: { backgroundColor: theme.danger, borderColor: theme.danger },
+  gridBtnActive: { borderColor: theme.primary },
+  gridBtnDisabled: { opacity: 0.45 },
+  gridTitle: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: theme.text,
+    marginTop: 10,
+  },
+  gridSub: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
-  btnTxt: { fontSize: 11, fontWeight: "bold", marginTop: 4 },
-  btnTxtStop: { color: "#FFFFFF" },
-  btnTxtStart: { color: "#10B981" },
-  btnTxtSec: {
-    fontSize: 11,
-    fontWeight: "600",
-    marginTop: 4,
-    color: "#374151",
+  divider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginTop: 6,
+    marginBottom: 10,
   },
-  btnTxtActive: { color: "#3B82F6" },
-  btnTxtUV: { color: "#D97706" },
 
   sliderWrap: { marginTop: 14 },
   sliderLabelRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 2,
-    gap: 4,
+    gap: 6,
   },
   sliderIcon: { fontSize: 14 },
-  sliderLabel: { flex: 1, fontSize: 13, fontWeight: "600", color: "#4B5563" },
+  sliderLabel: { flex: 1, fontSize: 13, fontWeight: "600", color: theme.text },
   sliderValue: {
     fontSize: 13,
     fontWeight: "bold",
@@ -442,7 +417,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   slider: { width: "100%", height: 36 },
-  sliderOff: { width: "100%", height: 36, opacity: 0.35 },
+  sliderOff: { width: "100%", height: 36, opacity: 0.4 },
 });
 
 export default MainControls;

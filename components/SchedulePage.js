@@ -11,9 +11,10 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { dynamoDBService } from "../services/dynamoDBService";
+import { theme } from "../theme";
 
 const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -27,7 +28,8 @@ const BLANK = {
   isActive: true,
 };
 
-const SchedulePage = ({ onGoBack }) => {
+const SchedulePage = () => {
+  const insets = useSafeAreaInsets();
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
@@ -168,27 +170,29 @@ const SchedulePage = ({ onGoBack }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onGoBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Agendamentos</Text>
+        <View>
+          <Text style={styles.headerTitle}>Agenda</Text>
+          <Text style={styles.headerSub}>
+            {schedules.length} agendamento{schedules.length === 1 ? "" : "s"}
+          </Text>
+        </View>
         <TouchableOpacity onPress={load} style={styles.refreshBtn}>
-          <Ionicons name="refresh-outline" size={22} color="#374151" />
+          <Ionicons name="refresh-outline" size={22} color={theme.textMuted} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <TouchableOpacity style={styles.addBtn} onPress={openModal}>
-          <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
+          <Ionicons name="add-circle-outline" size={20} color="#06281A" />
           <Text style={styles.addBtnText}>Novo Agendamento</Text>
         </TouchableOpacity>
 
         {loading ? (
           <ActivityIndicator
             size="large"
-            color="#3B82F6"
+            color={theme.primary}
             style={{ marginTop: 50 }}
           />
         ) : schedules.length === 0 ? (
@@ -196,7 +200,7 @@ const SchedulePage = ({ onGoBack }) => {
             <MaterialCommunityIcons
               name="calendar-clock"
               size={64}
-              color="#D1D5DB"
+              color={theme.textFaint}
             />
             <Text style={styles.emptyTitle}>Nenhum agendamento</Text>
             <Text style={styles.emptySub}>
@@ -211,25 +215,30 @@ const SchedulePage = ({ onGoBack }) => {
               style={[styles.card, !s.isActive && styles.cardOff]}
             >
               <View style={styles.cardTop}>
-                <View>
-                  <Text style={styles.timeText}>
-                    {s.startHour}:{s.startMinute}
-                  </Text>
-                  <Text style={styles.durationText}>{s.duration} min</Text>
+                <View style={styles.timeWrap}>
+                  <View style={styles.clockIcon}>
+                    <Ionicons
+                      name="time-outline"
+                      size={20}
+                      color={theme.primary}
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.timeText}>
+                      {s.startHour}:{s.startMinute}
+                    </Text>
+                    <Text style={styles.durationText}>
+                      Duração · {s.duration} min
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.cardActions}>
                   <Switch
                     value={!!s.isActive}
                     onValueChange={() => handleToggleActive(s)}
-                    trackColor={{ false: "#E5E7EB", true: "#BBF7D0" }}
-                    thumbColor={s.isActive ? "#10B981" : "#9CA3AF"}
+                    trackColor={{ false: theme.track, true: theme.primaryDark }}
+                    thumbColor={s.isActive ? theme.primary : theme.textMuted}
                   />
-                  <TouchableOpacity
-                    onPress={() => handleDelete(s.scheduleId)}
-                    style={styles.delBtn}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -256,16 +265,26 @@ const SchedulePage = ({ onGoBack }) => {
                 ))}
               </View>
 
-              <View style={styles.sectorsRow}>
-                {Object.entries(s.sectors || {})
-                  .filter(([, v]) => v)
-                  .map(([k]) => (
-                    <View key={k} style={styles.sectorTag}>
-                      <Text style={styles.sectorTagTxt}>
-                        {k.replace("sector_", "Setor ")}
+              <View style={styles.cardFooter}>
+                <View style={styles.sectorsRow}>
+                  {Object.entries(s.sectors || {})
+                    .filter(([, v]) => v)
+                    .map(([k]) => (
+                      <Text key={k} style={styles.sectorTagTxt}>
+                        • {k.replace("sector_", "Setor ")}
                       </Text>
-                    </View>
-                  ))}
+                    ))}
+                </View>
+                <TouchableOpacity
+                  onPress={() => handleDelete(s.scheduleId)}
+                  style={styles.delBtn}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={20}
+                    color={theme.danger}
+                  />
+                </TouchableOpacity>
               </View>
             </View>
           ))
@@ -283,6 +302,7 @@ const SchedulePage = ({ onGoBack }) => {
               <TextInput
                 style={styles.input}
                 placeholder="Ex: Irrigação matinal"
+                placeholderTextColor={theme.textFaint}
                 value={form.label}
                 onChangeText={(v) => patch("label", v)}
               />
@@ -295,6 +315,7 @@ const SchedulePage = ({ onGoBack }) => {
                     keyboardType="numeric"
                     maxLength={2}
                     placeholder="HH"
+                    placeholderTextColor={theme.textFaint}
                     value={form.startHour}
                     onChangeText={patchHour}
                     onBlur={blurHour}
@@ -308,6 +329,7 @@ const SchedulePage = ({ onGoBack }) => {
                     keyboardType="numeric"
                     maxLength={2}
                     placeholder="MM"
+                    placeholderTextColor={theme.textFaint}
                     value={form.startMinute}
                     onChangeText={patchMinute}
                     onBlur={blurMinute}
@@ -322,6 +344,7 @@ const SchedulePage = ({ onGoBack }) => {
                 keyboardType="numeric"
                 maxLength={3}
                 placeholder="30"
+                placeholderTextColor={theme.textFaint}
                 value={form.duration}
                 onChangeText={patchDuration}
               />
@@ -361,8 +384,10 @@ const SchedulePage = ({ onGoBack }) => {
                     onValueChange={(v) =>
                       patch("sectors", { ...form.sectors, [k]: v })
                     }
-                    trackColor={{ false: "#E5E7EB", true: "#BBF7D0" }}
-                    thumbColor={form.sectors[k] ? "#10B981" : "#9CA3AF"}
+                    trackColor={{ false: theme.track, true: theme.primaryDark }}
+                    thumbColor={
+                      form.sectors[k] ? theme.primary : theme.textMuted
+                    }
                   />
                 </View>
               ))}
@@ -380,7 +405,7 @@ const SchedulePage = ({ onGoBack }) => {
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator color="#FFF" size="small" />
+                    <ActivityIndicator color="#06281A" size="small" />
                   ) : (
                     <Text style={styles.saveBtnTxt}>Salvar</Text>
                   )}
@@ -390,141 +415,159 @@ const SchedulePage = ({ onGoBack }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F0F2F5" },
+  root: { flex: 1, backgroundColor: theme.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  backBtn: { padding: 6 },
   refreshBtn: { padding: 6 },
-  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#111827" },
-  content: { padding: 16 },
+  headerTitle: { fontSize: 26, fontWeight: "bold", color: theme.text },
+  headerSub: { fontSize: 13, color: theme.textMuted, marginTop: 2 },
+  content: { padding: 16, paddingTop: 4, paddingBottom: 24 },
 
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#3B82F6",
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: theme.primary,
+    borderRadius: 14,
+    padding: 15,
     marginBottom: 16,
     gap: 8,
   },
-  addBtnText: { color: "#FFF", fontWeight: "bold", fontSize: 15 },
+  addBtnText: { color: "#06281A", fontWeight: "bold", fontSize: 15 },
 
   empty: { alignItems: "center", paddingTop: 60 },
   emptyTitle: {
     fontSize: 17,
     fontWeight: "bold",
-    color: "#9CA3AF",
+    color: theme.textMuted,
     marginTop: 14,
   },
   emptySub: {
     fontSize: 13,
-    color: "#D1D5DB",
+    color: theme.textFaint,
     textAlign: "center",
     marginTop: 8,
     lineHeight: 20,
   },
 
   card: {
-    backgroundColor: "#FFF",
-    borderRadius: 14,
+    backgroundColor: theme.bgCard,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  cardOff: { opacity: 0.55 },
+  cardOff: { opacity: 0.5 },
   cardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  timeText: { fontSize: 28, fontWeight: "bold", color: "#111827" },
-  durationText: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  timeWrap: { flexDirection: "row", alignItems: "center", gap: 12 },
+  clockIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: theme.bgCardAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timeText: { fontSize: 24, fontWeight: "bold", color: theme.text },
+  durationText: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
   cardActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  delBtn: { padding: 6 },
-  cardLabel: { fontSize: 13, color: "#6B7280", marginBottom: 8 },
+  cardLabel: { fontSize: 13, color: theme.textMuted, marginBottom: 10 },
 
-  daysRow: { flexDirection: "row", gap: 4, marginBottom: 8, flexWrap: "wrap" },
+  daysRow: { flexDirection: "row", gap: 5, marginBottom: 12, flexWrap: "wrap" },
   dayBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: theme.bgCardAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  dayBadgeOn: { backgroundColor: "#DBEAFE" },
-  dayTxt: { fontSize: 11, color: "#9CA3AF", fontWeight: "600" },
-  dayTxtOn: { color: "#2563EB" },
+  dayBadgeOn: {
+    backgroundColor: theme.primarySoft,
+    borderColor: theme.primary,
+  },
+  dayTxt: { fontSize: 11, color: theme.textFaint, fontWeight: "600" },
+  dayTxtOn: { color: theme.primary },
 
-  sectorsRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  sectorTag: {
-    backgroundColor: "#D1FAE5",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    paddingTop: 10,
   },
-  sectorTagTxt: { fontSize: 11, color: "#065F46", fontWeight: "600" },
+  sectorsRow: { flexDirection: "row", gap: 12, flexWrap: "wrap", flex: 1 },
+  sectorTagTxt: { fontSize: 12, color: theme.textMuted, fontWeight: "600" },
+  delBtn: { padding: 6 },
 
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: "#FFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: theme.bgCard,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     padding: 20,
     maxHeight: "90%",
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#111827",
+    color: theme.text,
     marginBottom: 16,
   },
   formLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#374151",
+    color: theme.textMuted,
     marginBottom: 6,
     marginTop: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: theme.border,
     borderRadius: 10,
     padding: 12,
     fontSize: 15,
-    color: "#111827",
-    backgroundColor: "#F9FAFB",
+    color: theme.text,
+    backgroundColor: theme.bgCardAlt,
   },
   timeRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   timeInput: { textAlign: "center" },
   timeHint: {
     fontSize: 11,
-    color: "#9CA3AF",
+    color: theme.textFaint,
     textAlign: "center",
     marginTop: 4,
   },
-  colon: { fontSize: 24, fontWeight: "bold", color: "#374151", marginTop: 10 },
+  colon: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: theme.textMuted,
+    marginTop: 10,
+  },
 
   daysSelector: {
     flexDirection: "row",
@@ -533,14 +576,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   daySel: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: theme.bgCardAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  daySelOn: { backgroundColor: "#2563EB" },
-  daySelTxt: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
-  daySelTxtOn: { color: "#FFF" },
+  daySelOn: { backgroundColor: theme.primary, borderColor: theme.primary },
+  daySelTxt: { fontSize: 12, fontWeight: "600", color: theme.textMuted },
+  daySelTxtOn: { color: "#06281A" },
 
   sectorRow: {
     flexDirection: "row",
@@ -548,28 +593,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: theme.border,
   },
-  sectorLabel: { fontSize: 14, color: "#374151" },
+  sectorLabel: { fontSize: 14, color: theme.text },
 
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 20, marginBottom: 8 },
   cancelBtn: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: theme.border,
     borderRadius: 10,
     padding: 14,
     alignItems: "center",
   },
-  cancelBtnTxt: { color: "#374151", fontWeight: "600" },
+  cancelBtnTxt: { color: theme.text, fontWeight: "600" },
   saveBtn: {
     flex: 1,
-    backgroundColor: "#3B82F6",
+    backgroundColor: theme.primary,
     borderRadius: 10,
     padding: 14,
     alignItems: "center",
   },
-  saveBtnTxt: { color: "#FFF", fontWeight: "bold", fontSize: 15 },
+  saveBtnTxt: { color: "#06281A", fontWeight: "bold", fontSize: 15 },
 });
 
 export default SchedulePage;
