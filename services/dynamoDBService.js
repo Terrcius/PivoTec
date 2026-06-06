@@ -254,6 +254,8 @@ export const dynamoDBService = {
         KeyConditionExpression: "pivotId = :id",
         ExpressionAttributeValues: { ":id": { S: pivotId } },
       });
+      
+      // Ajuste: Passando o item envelopado em { M: item } para o unmarshal decodificar perfeitamente
       return (result.Items || []).map((item) => unmarshal({ M: item }));
     } catch (e) {
       console.error("[DynamoDB] getSchedules:", e);

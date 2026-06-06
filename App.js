@@ -160,7 +160,6 @@ const App = () => {
           }
         },
         (err) => {
-          // NÃO seta offline aqui — pode ser o discovery sendo cancelado normalmente
           console.warn("[App] ⚠️ Discovery encerrado:", err?.message || err);
         },
       );
@@ -178,10 +177,13 @@ const App = () => {
     console.log(`[App] 📡 Inscrevendo nos tópicos do pivô: ${pivotId}`);
     if (discoverySub.current?.unsubscribe) discoverySub.current.unsubscribe();
 
+    // Envolvemos a chamada para não recriar a assinatura se a função mudar
+    const messageListener = (msg) => handleIoTMessage(msg);
+
     try {
       iotSub.current = iotService.subscribe(
         pivotId,
-        handleIoTMessage,
+        messageListener,
         (err) => {
           setIsConnected(false);
           console.warn(
@@ -197,11 +199,11 @@ const App = () => {
     return () => {
       if (iotSub.current?.unsubscribe) iotSub.current.unsubscribe();
     };
-  }, [pivotId]);
+  }, [pivotId]); // <-- Correção: handleIoTMessage removido daqui!
 
   // ── Heartbeat: detecta quando o pivô para de enviar dados ────────────────
   useEffect(() => {
-    const TIMEOUT = 90_000; // 90s sem mensagem = offline
+    const TIMEOUT = 90_000;
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastMessageRef.current;
       if (elapsed > TIMEOUT && isConnected) {
@@ -210,7 +212,7 @@ const App = () => {
         );
         setIsConnected(false);
       }
-    }, 15_000); // checa a cada 15s
+    }, 15_000);
     return () => clearInterval(interval);
   }, [isConnected]);
 
@@ -239,12 +241,18 @@ const App = () => {
   );
 
   // ── Handlers das Ações ────────────────────────────────────────────────────
-  const handleToggleRotation = useCallback(() => {
+  const handleToggleDirection = useCallback(() => {
     if (!pivotData || !isConnected) return;
-    const next =
-      pivotData.status.rotation_status === "Rodando" ? "Parado" : "Rodando";
-    sendCommandViaMQTT(next === "Rodando" ? "ON" : "OFF");
-    patchStatus({ rotation_status: next });
+    const currentPower = Math.abs(pivotData.status.power) || 17;
+    const isCurrentlyClockwise = pivotData.status.direction === "Horário";
+    const newVal = isCurrentlyClockwise ? -currentPower : currentPower;
+    const nextDirectionText = isCurrentlyClockwise ? "Anti-horário" : "Horário";
+    console.log(`[App] 🔄 Alterando direção para: ${nextDirectionText} (Sinal VEL: ${newVal})`);
+    sendCommandViaMQTT("VEL", newVal);
+    patchStatus({ 
+      direction: nextDirectionText, 
+      power: currentPower 
+    });
   }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
 
   const handleToggleDirection = useCallback(() => {
@@ -259,17 +267,19 @@ const App = () => {
 
   const handleChangePower = useCallback(
     (v) => {
-      const power = parseInt(v);
-      const isAntiClockwise = pivotData?.status?.direction === "Anti-horário";
-      const val = isAntiClockwise ? -Math.abs(power) : Math.abs(power);
+      if (!isConnected || !pivotData) return;
+      const power = Math.abs(parseInt(v)) || 17; 
+      const isAntiClockwise = pivotData.status.direction === "Anti-horário";
+      const val = isAntiClockwise ? -power : power;
       sendCommandViaMQTT("VEL", val);
-      patchStatus({ power: Math.abs(power) });
+      patchStatus({ power: power }); 
     },
     [pivotData, isConnected, sendCommandViaMQTT, patchStatus],
   );
 
   const handleChangeFlow = useCallback(
     (v) => {
+      if (!isConnected) return; // <-- Correção: Proteção adicionada
       const f = Math.round(v);
       sendCommandViaMQTT("BOMBA", f);
       patchStatus({
@@ -277,11 +287,12 @@ const App = () => {
         water_pump_status: f > 0 ? "Ligada" : "Desligada",
       });
     },
-    [isConnected, sendCommandViaMQTT, patchStatus],
+    [isConnected, sendCommandViaMQTT, patchStatus], // <-- Correção: Dependências completas
   );
 
   const handleChangeUVIntensity = useCallback(
     (v) => {
+      if (!isConnected) return; // <-- Correção: Proteção adicionada
       const i = Math.round(v);
       sendCommandViaMQTT("LED", i);
       patchStatus({
@@ -289,10 +300,11 @@ const App = () => {
         uv_light_status: i > 0 ? "Ligada" : "Desligada",
       });
     },
-    [isConnected, sendCommandViaMQTT, patchStatus],
+    [isConnected, sendCommandViaMQTT, patchStatus], // <-- Correção: Dependências completas
   );
 
   const handleToggleUVLight = useCallback(() => {
+    if (!isConnected) return;
     const on = pivotData?.status?.uv_light_status !== "Ligada";
     sendCommandViaMQTT("LED", on ? 100 : 0);
     patchStatus({
