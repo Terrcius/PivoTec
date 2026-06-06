@@ -1,54 +1,41 @@
 import React from "react";
-import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
+import { TouchableOpacity, Text, StyleSheet } from "react-native";
 
 const MetricCard = ({ value, label, onClick }) => {
   return (
-    // O container do cartão é um botão tocável
-    <TouchableOpacity onPress={onClick} style={styles.cardContainer}>
-      <View style={styles.cardContent}>
-        {/* O valor numérico com estilos dinâmicos */}
-        <Text style={styles.valueText}>{value}</Text>
-        {/* O rótulo/descrição */}
-        <Text style={styles.labelText}>{label}</Text>
-      </View>
+    <TouchableOpacity style={styles.card} onPress={onClick} activeOpacity={0.7}>
+      <Text style={styles.valueText}>{value}</Text>
+      <Text style={styles.labelText}>{label}</Text>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
-    // Estilos para simular o layout de múltiplos cartões na mesma linha
-    flexGrow: 1, // Permite que o cartão se expanda para preencher o espaço
-    flexBasis: "45%", // Define o tamanho base para 45%, criando 2 colunas
-    minWidth: 100, // Garante que o cartão não fique muito pequeno
-
-    backgroundColor: "#FFFFFF",
-    padding: 20,
-    borderRadius: 12,
-
-    // Estilos de sombra para Android e iOS
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-
-    margin: 5,
-  },
-  cardContent: {
+  card: {
+    flex: 1, // 🌟 ISSO AQUI É O SEGREDO: força os 3 cards a dividirem o espaço igualmente!
+    backgroundColor: "#FFF",
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    // Seus estilos de sombra atuais...
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   valueText: {
-    fontSize: 20,
+    fontSize: 18, // Um tamanho bom para caber mesmo em telas menores
     fontWeight: "bold",
-    color: "#22C55E",
+    color: "#10B981", // Cor verde que você está usando
+    marginBottom: 4,
   },
   labelText: {
     fontSize: 12,
     color: "#6B7280",
-    textAlign: "center",
-    marginTop: 4,
+    fontWeight: "500",
   },
 });
 
