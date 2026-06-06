@@ -94,6 +94,7 @@ const App = () => {
   const [graphType, setGraphType] = useState("temperature");
   const [isConnected, setIsConnected] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
+  const [deviceInfo, setDeviceInfo] = useState({ ip: null, ver: null });
 
   const iotSub = useRef(null);
   const discoverySub = useRef(null);
@@ -109,11 +110,23 @@ const App = () => {
   const handleIoTMessage = useCallback(
     (msg) => {
       lastMessageRef.current = Date.now();
-      if (msg.id && !pivotId) {
-        setPivotId(msg.id);
-        setIsConnected(true);
+
+      // Captura o id do pivô (presença ou primeira telemetria)
+      if (msg.id && !pivotId) setPivotId(msg.id);
+
+      // ── Mensagem de presença/conexão (pivot/<id>/status, retida + LWT) ──
+      // Payload: { id, online, ip, ver }. O campo "online" é a fonte
+      // autoritativa de conectado/offline (não depende do heartbeat).
+      if (msg.online !== undefined) {
+        setIsConnected(!!msg.online);
+        setDeviceInfo((d) => ({
+          ip: msg.ip ?? d.ip,
+          ver: msg.ver ?? d.ver,
+        }));
         return;
       }
+
+      // Demais mensagens (telemetria) implicam que o pivô está online
       setIsConnected(true);
       if (msg.ang !== undefined) setCurrentAngle(parseFloat(msg.ang));
       const patch = {};
@@ -142,7 +155,7 @@ const App = () => {
         (msg) => {
           if (!pivotId) {
             setPivotId(msg.id);
-            setIsConnected(true);
+            // Não força "conectado": handleIoTMessage decide pelo campo online
             handleIoTMessage(msg);
           }
         },
@@ -347,7 +360,13 @@ const App = () => {
   } else if (view === "dados") {
     screen = <DetailedGraphsPage initialType={graphType} />;
   } else if (view === "perfil") {
-    screen = <ProfilePage />;
+    screen = (
+      <ProfilePage
+        pivotId={pivotId}
+        deviceInfo={deviceInfo}
+        isConnected={isConnected}
+      />
+    );
   } else {
     screen = (
       <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -362,6 +381,7 @@ const App = () => {
                 <Text style={styles.headerTitle}>Pivô Tec</Text>
                 <Text style={styles.headerSub}>
                   {pivotId ? pivotId : "Aguardando pivô..."}
+                  {deviceInfo.ver ? `  ·  v${deviceInfo.ver}` : ""}
                 </Text>
               </View>
             </View>
@@ -393,6 +413,28 @@ const App = () => {
               </Text>
             </View>
           </View>
+
+          {/* Info do dispositivo (IP local + versão de firmware) */}
+          {pivotId && (deviceInfo.ip || deviceInfo.ver) && (
+            <View style={styles.deviceRow}>
+              <Ionicons
+                name="hardware-chip-outline"
+                size={15}
+                color={theme.textMuted}
+              />
+              {deviceInfo.ip && (
+                <Text style={styles.deviceText}>IP {deviceInfo.ip}</Text>
+              )}
+              {deviceInfo.ip && deviceInfo.ver && (
+                <Text style={styles.deviceDivider}>·</Text>
+              )}
+              {deviceInfo.ver && (
+                <Text style={styles.deviceText}>
+                  Firmware v{deviceInfo.ver}
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Aguardando pivô */}
           {!pivotId && (
@@ -659,6 +701,17 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 6,
   },
+
+  deviceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: -6,
+    marginBottom: 14,
+    paddingHorizontal: 2,
+  },
+  deviceText: { fontSize: 12, color: theme.textMuted },
+  deviceDivider: { fontSize: 12, color: theme.textFaint },
 });
 
 const AppWrapper = () => (

@@ -34,7 +34,11 @@ const InfoRow = ({ icon, label, value }) => (
   </View>
 );
 
-const ProfilePage = () => {
+const ProfilePage = ({
+  pivotId,
+  deviceInfo = { ip: null, ver: null },
+  isConnected = false,
+}) => {
   const insets = useSafeAreaInsets();
   const u = MOCK_USER;
 
@@ -77,6 +81,62 @@ const ProfilePage = () => {
             icon="calendar-outline"
             label="Membro desde"
             value={u.memberSince}
+          />
+        </View>
+
+        {/* Dispositivo */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Dispositivo</Text>
+          <View style={styles.infoRow}>
+            <View style={styles.infoIcon}>
+              <Ionicons
+                name="hardware-chip-outline"
+                size={18}
+                color={theme.primary}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoLabel}>Pivô</Text>
+              <Text style={styles.infoValue}>{pivotId || "—"}</Text>
+            </View>
+          </View>
+          <View style={styles.infoRow}>
+            <View style={styles.infoIcon}>
+              <Ionicons name="pulse-outline" size={18} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoLabel}>Status</Text>
+              <View style={styles.statusLine}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    {
+                      backgroundColor: isConnected
+                        ? theme.primary
+                        : theme.danger,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.infoValue,
+                    { color: isConnected ? theme.primary : theme.danger },
+                  ]}
+                >
+                  {isConnected ? "Online" : "Offline"}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <InfoRow
+            icon="wifi-outline"
+            label="IP local"
+            value={deviceInfo.ip || "—"}
+          />
+          <InfoRow
+            icon="git-branch-outline"
+            label="Firmware"
+            value={deviceInfo.ver ? `v${deviceInfo.ver}` : "—"}
           />
         </View>
 
@@ -195,6 +255,13 @@ const styles = StyleSheet.create({
     color: theme.text,
     marginTop: 1,
   },
+  statusLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
 
   planRow: {
     flexDirection: "row",
