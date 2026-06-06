@@ -110,7 +110,6 @@ const App = () => {
     try {
       discoverySub.current = iotService.discover(
         (msg) => {
-<<<<<<< HEAD
           if (!pivotId) {
             setPivotId(msg.id);
             setIsConnected(true);
@@ -119,9 +118,6 @@ const App = () => {
         },
         (err) => {
           console.warn("[App] ⚠️ Discovery encerrado:", err?.message || err);
-=======
-          if (!pivotId) { setPivotId(msg.id); setIsConnected(true); handleIoTMessage(msg); }
->>>>>>> Development
         },
         (err) => console.warn("[App] Discovery encerrado:", err?.message || err),
       );
@@ -132,7 +128,6 @@ const App = () => {
   useEffect(() => {
     if (!pivotId) return;
     if (discoverySub.current?.unsubscribe) discoverySub.current.unsubscribe();
-<<<<<<< HEAD
 
     const messageListener = (msg) => handleIoTMessage(msg);
 
@@ -155,17 +150,9 @@ const App = () => {
     return () => {
       if (iotSub.current?.unsubscribe) iotSub.current.unsubscribe();
     };
-=======
-    try {
-      iotSub.current = iotService.subscribe(pivotId, handleIoTMessage,
-        (err) => { setIsConnected(false); console.warn("[App] MQTT interrompida:", err?.message || err); });
-    } catch (err) { console.error("[App] Erro subscribe:", err); }
-    return () => { if (iotSub.current?.unsubscribe) iotSub.current.unsubscribe(); };
->>>>>>> Development
   }, [pivotId]);
 
   useEffect(() => {
-<<<<<<< HEAD
     const TIMEOUT = 90_000;
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastMessageRef.current;
@@ -175,10 +162,6 @@ const App = () => {
         );
         setIsConnected(false);
       }
-=======
-    const interval = setInterval(() => {
-      if (Date.now() - lastMessageRef.current > 90_000 && isConnected) setIsConnected(false);
->>>>>>> Development
     }, 15_000);
     return () => clearInterval(interval);
   }, [isConnected]);
@@ -207,7 +190,6 @@ const App = () => {
   // VERSÃO CORRIGIDA E SEM DUPLICIDADE:
   const handleToggleDirection = useCallback(() => {
     if (!pivotData || !isConnected) return;
-<<<<<<< HEAD
     const currentPower = Math.abs(pivotData.status.power) || 17;
     const isCurrentlyClockwise = pivotData.status.direction === "Horário";
     const newVal = isCurrentlyClockwise ? -currentPower : currentPower;
@@ -258,32 +240,6 @@ const App = () => {
     },
     [isConnected, sendCommandViaMQTT, patchStatus],
   );
-=======
-    const cp = Math.abs(pivotData.status.power || 50);
-    const anti = pivotData.status.direction === "Horário";
-    sendCommandViaMQTT("VEL", anti ? -cp : cp);
-    patchStatus({ direction: anti ? "Anti-horário" : "Horário", power: cp });
-  }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
-
-  const handleChangePower = useCallback((v) => {
-    const power = parseInt(v);
-    const anti = pivotData?.status?.direction === "Anti-horário";
-    sendCommandViaMQTT("VEL", anti ? -Math.abs(power) : Math.abs(power));
-    patchStatus({ power: Math.abs(power) });
-  }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
-
-  const handleChangeFlow = useCallback((v) => {
-    const f = Math.round(v);
-    sendCommandViaMQTT("BOMBA", f);
-    patchStatus({ water_flow: f, water_pump_status: f > 0 ? "Ligada" : "Desligada" });
-  }, [isConnected, sendCommandViaMQTT, patchStatus]);
-
-  const handleChangeUVIntensity = useCallback((v) => {
-    const i = Math.round(v);
-    sendCommandViaMQTT("LED", i);
-    patchStatus({ uv_intensity: i, uv_light_status: i > 0 ? "Ligada" : "Desligada" });
-  }, [isConnected, sendCommandViaMQTT, patchStatus]);
->>>>>>> Development
 
   const handleToggleUVLight = useCallback(() => {
     if (!isConnected) return;
