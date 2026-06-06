@@ -177,7 +177,6 @@ const App = () => {
     console.log(`[App] 📡 Inscrevendo nos tópicos do pivô: ${pivotId}`);
     if (discoverySub.current?.unsubscribe) discoverySub.current.unsubscribe();
 
-    // Envolvemos a chamada para não recriar a assinatura se a função mudar
     const messageListener = (msg) => handleIoTMessage(msg);
 
     try {
@@ -199,7 +198,7 @@ const App = () => {
     return () => {
       if (iotSub.current?.unsubscribe) iotSub.current.unsubscribe();
     };
-  }, [pivotId]); // <-- Correção: handleIoTMessage removido daqui!
+  }, [pivotId]);
 
   // ── Heartbeat: detecta quando o pivô para de enviar dados ────────────────
   useEffect(() => {
@@ -241,28 +240,28 @@ const App = () => {
   );
 
   // ── Handlers das Ações ────────────────────────────────────────────────────
+  const handleToggleRotation = useCallback(() => {
+    if (!pivotData || !isConnected) return;
+    const next =
+      pivotData.status.rotation_status === "Rodando" ? "Parado" : "Rodando";
+    sendCommandViaMQTT(next === "Rodando" ? "ON" : "OFF");
+    patchStatus({ rotation_status: next });
+  }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
+
+  // VERSÃO CORRIGIDA E SEM DUPLICIDADE:
   const handleToggleDirection = useCallback(() => {
     if (!pivotData || !isConnected) return;
     const currentPower = Math.abs(pivotData.status.power) || 17;
     const isCurrentlyClockwise = pivotData.status.direction === "Horário";
     const newVal = isCurrentlyClockwise ? -currentPower : currentPower;
     const nextDirectionText = isCurrentlyClockwise ? "Anti-horário" : "Horário";
+    
     console.log(`[App] 🔄 Alterando direção para: ${nextDirectionText} (Sinal VEL: ${newVal})`);
     sendCommandViaMQTT("VEL", newVal);
     patchStatus({ 
       direction: nextDirectionText, 
       power: currentPower 
     });
-  }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
-
-  const handleToggleDirection = useCallback(() => {
-    if (!pivotData || !isConnected) return;
-    const currentPower = Math.abs(pivotData.status.power || 50);
-    const isAntiClockwise = pivotData.status.direction === "Horário";
-    const newVal = isAntiClockwise ? -currentPower : currentPower;
-    const next = isAntiClockwise ? "Anti-horário" : "Horário";
-    sendCommandViaMQTT("VEL", newVal);
-    patchStatus({ direction: next, power: currentPower });
   }, [pivotData, isConnected, sendCommandViaMQTT, patchStatus]);
 
   const handleChangePower = useCallback(
@@ -279,7 +278,7 @@ const App = () => {
 
   const handleChangeFlow = useCallback(
     (v) => {
-      if (!isConnected) return; // <-- Correção: Proteção adicionada
+      if (!isConnected) return;
       const f = Math.round(v);
       sendCommandViaMQTT("BOMBA", f);
       patchStatus({
@@ -287,12 +286,12 @@ const App = () => {
         water_pump_status: f > 0 ? "Ligada" : "Desligada",
       });
     },
-    [isConnected, sendCommandViaMQTT, patchStatus], // <-- Correção: Dependências completas
+    [isConnected, sendCommandViaMQTT, patchStatus],
   );
 
   const handleChangeUVIntensity = useCallback(
     (v) => {
-      if (!isConnected) return; // <-- Correção: Proteção adicionada
+      if (!isConnected) return;
       const i = Math.round(v);
       sendCommandViaMQTT("LED", i);
       patchStatus({
@@ -300,7 +299,7 @@ const App = () => {
         uv_light_status: i > 0 ? "Ligada" : "Desligada",
       });
     },
-    [isConnected, sendCommandViaMQTT, patchStatus], // <-- Correção: Dependências completas
+    [isConnected, sendCommandViaMQTT, patchStatus],
   );
 
   const handleToggleUVLight = useCallback(() => {
