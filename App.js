@@ -26,7 +26,8 @@ import BottomNav from "./components/BottomNav";
 import { configureAWS } from "./services/awsConfig";
 import { iotService } from "./services/iotService";
 import { dynamoDBService } from "./services/dynamoDBService";
-import { theme } from "./theme";
+import { darkTheme, lightTheme } from "./theme";
+import { t } from "./i18n";
 
 configureAWS();
 
@@ -41,23 +42,17 @@ const ConfigPage = ({
   onToggleUVLight,
   onToggleDirection,
   onZeroPosition,
+  theme,
+  lang,
 }) => {
   const insets = useSafeAreaInsets();
   return (
-    <View
-      style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top }}
-    >
-      <View style={cs.header}>
-        <Text style={cs.headerTitle}>Controle</Text>
-        <Text style={cs.headerSub}>Operação manual do pivô</Text>
+    <View style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top }}>
+      <View style={cs(theme).header}>
+        <Text style={cs(theme).headerTitle}>{t(lang, "control")}</Text>
+        <Text style={cs(theme).headerSub}>{t(lang, "manual_operation")}</Text>
       </View>
-      <ScrollView
-        contentContainerStyle={{
-          padding: 16,
-          paddingTop: 4,
-          paddingBottom: 24,
-        }}
-      >
+      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 24 }}>
         <MainControls
           status={pivotData?.status?.rotation_status}
           direction={pivotData?.status?.direction}
@@ -73,17 +68,20 @@ const ConfigPage = ({
           onChangeUVIntensity={onChangeUVIntensity}
           isConnected={isConnected}
           onZeroPosition={onZeroPosition}
+          theme={theme}
+          lang={lang}
         />
       </ScrollView>
     </View>
   );
 };
 
-const cs = StyleSheet.create({
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
-  headerTitle: { fontSize: 26, fontWeight: "bold", color: theme.text },
-  headerSub: { fontSize: 13, color: theme.textMuted, marginTop: 2 },
-});
+const cs = (theme) =>
+  StyleSheet.create({
+    header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
+    headerTitle: { fontSize: 26, fontWeight: "bold", color: theme.text },
+    headerSub: { fontSize: 13, color: theme.textMuted, marginTop: 2 },
+  });
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 const App = () => {
@@ -95,6 +93,11 @@ const App = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
   const [deviceInfo, setDeviceInfo] = useState({ ip: null, ver: null });
+
+  // ── Tema e Idioma ──
+  const [isDark, setIsDark] = useState(true);
+  const [lang, setLang] = useState("pt");
+  const theme = isDark ? darkTheme : lightTheme;
 
   const iotSub = useRef(null);
   const discoverySub = useRef(null);
@@ -110,13 +113,7 @@ const App = () => {
   const handleIoTMessage = useCallback(
     (msg) => {
       lastMessageRef.current = Date.now();
-
-      // Captura o id do pivô (presença ou primeira telemetria)
       if (msg.id && !pivotId) setPivotId(msg.id);
-
-      // ── Mensagem de presença/conexão (pivot/<id>/status, retida + LWT) ──
-      // Payload: { id, online, ip, ver }. O campo "online" é a fonte
-      // autoritativa de conectado/offline (não depende do heartbeat).
       if (msg.online !== undefined) {
         setIsConnected(!!msg.online);
         setDeviceInfo((d) => ({
@@ -125,8 +122,6 @@ const App = () => {
         }));
         return;
       }
-
-      // Demais mensagens (telemetria) implicam que o pivô está online
       setIsConnected(true);
       if (msg.ang !== undefined) setCurrentAngle(parseFloat(msg.ang));
       const patch = {};
@@ -155,7 +150,6 @@ const App = () => {
         (msg) => {
           if (!pivotId) {
             setPivotId(msg.id);
-            // Não força "conectado": handleIoTMessage decide pelo campo online
             handleIoTMessage(msg);
           }
         },
@@ -179,10 +173,7 @@ const App = () => {
         handleIoTMessage,
         (err) => {
           setIsConnected(false);
-          console.warn(
-            "[App] ⚠️ Conexão MQTT interrompida:",
-            err?.message || err,
-          );
+          console.warn("[App] ⚠️ Conexão MQTT interrompida:", err?.message || err);
         },
       );
     } catch (err) {
@@ -198,9 +189,7 @@ const App = () => {
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastMessageRef.current;
       if (elapsed > TIMEOUT && isConnected) {
-        console.warn(
-          `[App] ⏱️ Sem mensagens há ${Math.round(elapsed / 1000)}s → Offline`,
-        );
+        console.warn(`[App] ⏱️ Sem mensagens há ${Math.round(elapsed / 1000)}s → Offline`);
         setIsConnected(false);
       }
     }, 15_000);
@@ -330,14 +319,15 @@ const App = () => {
 
   if (!pivotData) {
     return (
-      <View style={[styles.loading, { paddingTop: insets.top }]}>
+      <View style={[styles(theme).loading, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={styles.loadingText}>Carregando dados do pivô...</Text>
+        <Text style={styles(theme).loadingText}>{t(lang, "loading")}</Text>
       </View>
     );
   }
 
   const isRotating = pivotData.status.rotation_status === "Rodando";
+  const st = styles(theme);
 
   // ─── Tela ativa ────────────────────────────────────────────────────────────
   let screen;
@@ -353,41 +343,48 @@ const App = () => {
         onToggleUVLight={handleToggleUVLight}
         onToggleDirection={handleToggleDirection}
         onZeroPosition={handleZeroPosition}
+        theme={theme}
+        lang={lang}
       />
     );
   } else if (view === "schedule") {
-    screen = <SchedulePage />;
+    screen = <SchedulePage theme={theme} lang={lang} />;
   } else if (view === "dados") {
-    screen = <DetailedGraphsPage initialType={graphType} />;
+    screen = <DetailedGraphsPage initialType={graphType} theme={theme} lang={lang} />;
   } else if (view === "perfil") {
     screen = (
       <ProfilePage
         pivotId={pivotId}
         deviceInfo={deviceInfo}
         isConnected={isConnected}
+        theme={theme}
+        isDark={isDark}
+        onToggleTheme={() => setIsDark((v) => !v)}
+        lang={lang}
+        onToggleLang={setLang}
       />
     );
   } else {
     screen = (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScrollView contentContainerStyle={styles.content}>
+      <View style={[st.root, { paddingTop: insets.top }]}>
+        <ScrollView contentContainerStyle={st.content}>
           {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <View style={styles.logoCircle}>
+          <View style={st.header}>
+            <View style={st.headerLeft}>
+              <View style={st.logoCircle}>
                 <Ionicons name="leaf" size={20} color={theme.primary} />
               </View>
               <View>
-                <Text style={styles.headerTitle}>Pivô Tec</Text>
-                <Text style={styles.headerSub}>
-                  {pivotId ? pivotId : "Aguardando pivô..."}
+                <Text style={st.headerTitle}>Pivô Tec</Text>
+                <Text style={st.headerSub}>
+                  {pivotId ? pivotId : t(lang, "waiting_pivot")}
                   {deviceInfo.ver ? `  ·  v${deviceInfo.ver}` : ""}
                 </Text>
               </View>
             </View>
             <View
               style={[
-                styles.badge,
+                st.badge,
                 {
                   backgroundColor: isConnected
                     ? theme.primarySoft
@@ -397,75 +394,64 @@ const App = () => {
             >
               <View
                 style={[
-                  styles.dot,
-                  {
-                    backgroundColor: isConnected ? theme.primary : theme.danger,
-                  },
+                  st.dot,
+                  { backgroundColor: isConnected ? theme.primary : theme.danger },
                 ]}
               />
               <Text
                 style={[
-                  styles.badgeText,
+                  st.badgeText,
                   { color: isConnected ? theme.primary : theme.danger },
                 ]}
               >
-                {isConnected ? "Em operação" : "Offline"}
+                {isConnected ? t(lang, "online") : t(lang, "offline")}
               </Text>
             </View>
           </View>
 
-          {/* Info do dispositivo (IP local + versão de firmware) */}
+          {/* Info do dispositivo */}
           {pivotId && (deviceInfo.ip || deviceInfo.ver) && (
-            <View style={styles.deviceRow}>
-              <Ionicons
-                name="hardware-chip-outline"
-                size={15}
-                color={theme.textMuted}
-              />
+            <View style={st.deviceRow}>
+              <Ionicons name="hardware-chip-outline" size={15} color={theme.textMuted} />
               {deviceInfo.ip && (
-                <Text style={styles.deviceText}>IP {deviceInfo.ip}</Text>
+                <Text style={st.deviceText}>IP {deviceInfo.ip}</Text>
               )}
               {deviceInfo.ip && deviceInfo.ver && (
-                <Text style={styles.deviceDivider}>·</Text>
+                <Text style={st.deviceDivider}>·</Text>
               )}
               {deviceInfo.ver && (
-                <Text style={styles.deviceText}>
-                  Firmware v{deviceInfo.ver}
-                </Text>
+                <Text style={st.deviceText}>{t(lang, "firmware")} v{deviceInfo.ver}</Text>
               )}
             </View>
           )}
 
           {/* Aguardando pivô */}
           {!pivotId && (
-            <View style={styles.waitingCard}>
+            <View style={st.waitingCard}>
               <Ionicons name="wifi-outline" size={36} color={theme.textMuted} />
-              <Text style={styles.waitingTitle}>Aguardando conexão</Text>
-              <Text style={styles.waitingSub}>
-                Ligue o pivô e aguarde a conexão via MQTT
-              </Text>
+              <Text style={st.waitingTitle}>{t(lang, "waiting_connection")}</Text>
+              <Text style={st.waitingSub}>{t(lang, "waiting_sub")}</Text>
             </View>
           )}
 
           {/* Visualização */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>Posição do Pivô</Text>
-              <View style={styles.angleChip}>
-                <Text style={styles.angleChipText}>
-                  {Math.round(currentAngle)}°
-                </Text>
+          <View style={st.card}>
+            <View style={st.cardHeaderRow}>
+              <Text style={st.cardTitle}>{t(lang, "pivot_position")}</Text>
+              <View style={st.angleChip}>
+                <Text style={st.angleChipText}>{Math.round(currentAngle)}°</Text>
               </View>
             </View>
             <PivotVisualization
               angle={currentAngle}
               sectors={pivotData.sectors}
+              theme={theme}
             />
             <TouchableOpacity
               style={[
-                styles.rotateBtn,
-                isRotating ? styles.rotateBtnStop : styles.rotateBtnStart,
-                !isConnected && styles.rotateBtnDisabled,
+                st.rotateBtn,
+                isRotating ? st.rotateBtnStop : st.rotateBtnStart,
+                !isConnected && st.rotateBtnDisabled,
               ]}
               onPress={handleToggleRotation}
               disabled={!isConnected}
@@ -477,17 +463,17 @@ const App = () => {
               />
               <Text
                 style={[
-                  styles.rotateBtnText,
+                  st.rotateBtnText,
                   { color: isRotating ? "#FFF" : theme.primary },
                 ]}
               >
-                {isRotating ? "Parar Rotação" : "Iniciar Rotação"}
+                {isRotating ? t(lang, "stop_rotation") : t(lang, "start_rotation")}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Métricas */}
-          <View style={styles.metricsRow}>
+          <View style={st.metricsRow}>
             <MetricCard
               icon="thermometer"
               accent={theme.accentOrange}
@@ -496,8 +482,9 @@ const App = () => {
                   ? `${pivotData.sensors.temperature}°C`
                   : "--°C"
               }
-              label="Temperatura"
+              label={t(lang, "temperature")}
               onClick={() => openGraph("temperature")}
+              theme={theme}
             />
             <MetricCard
               icon="water"
@@ -507,8 +494,9 @@ const App = () => {
                   ? `${pivotData.sensors.soil_humidity}%`
                   : "--%"
               }
-              label="Umid. Solo"
+              label={t(lang, "soil_humidity")}
               onClick={() => openGraph("soil_humidity")}
+              theme={theme}
             />
             <MetricCard
               icon="cloud"
@@ -518,18 +506,17 @@ const App = () => {
                   ? `${pivotData.sensors.air_humidity}%`
                   : "--%"
               }
-              label="Umid. Ar"
+              label={t(lang, "air_humidity")}
               onClick={() => openGraph("air_humidity")}
+              theme={theme}
             />
           </View>
 
           {/* Setores */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Status dos Setores</Text>
+          <View style={st.card}>
+            <Text style={st.cardTitle}>{t(lang, "sector_status")}</Text>
             {!isConnected && (
-              <Text style={styles.reconnectText}>
-                Conectando ao barramento MQTT…
-              </Text>
+              <Text style={st.reconnectText}>{t(lang, "connecting_mqtt")}</Text>
             )}
             <View style={{ marginTop: 10 }}>
               {Object.keys(pivotData.sectors)
@@ -545,6 +532,7 @@ const App = () => {
                       color={s.color}
                       onToggle={() => handleToggleSector(key)}
                       isAdjustable={isConnected && !isRotating}
+                      theme={theme}
                     />
                   );
                 })}
@@ -556,10 +544,13 @@ const App = () => {
   }
 
   return (
-    <View style={styles.shell}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.bg} />
+    <View style={st.shell}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={theme.bg}
+      />
       <View style={{ flex: 1 }}>{screen}</View>
-      <BottomNav active={view} onChange={setView} />
+      <BottomNav active={view} onChange={setView} theme={theme} lang={lang} />
     </View>
   );
 };
@@ -575,144 +566,140 @@ const buildDefaultData = () => ({
     uv_intensity: 0,
   },
   sectors: {
-    sector_1: {
-      crop: "Milho",
-      moisture: 70,
-      is_active: false,
-      color: "#FBBF24",
-    },
+    sector_1: { crop: "Milho", moisture: 70, is_active: false, color: "#FBBF24" },
     sector_2: { crop: "Soja", moisture: 65, is_active: true, color: "#34D399" },
   },
   sensors: { temperature: 30, soil_humidity: 68, air_humidity: 55 },
 });
 
-const styles = StyleSheet.create({
-  shell: { flex: 1, backgroundColor: theme.bg },
-  root: { flex: 1, backgroundColor: theme.bg },
-  loading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: theme.bg,
-  },
-  loadingText: { marginTop: 10, fontSize: 16, color: theme.textMuted },
-  content: { padding: 14, paddingBottom: 30 },
+const styles = (theme) =>
+  StyleSheet.create({
+    shell: { flex: 1, backgroundColor: theme.bg },
+    root: { flex: 1, backgroundColor: theme.bg },
+    loading: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.bg,
+    },
+    loadingText: { marginTop: 10, fontSize: 16, color: theme.textMuted },
+    content: { padding: 14, paddingBottom: 30 },
 
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  logoCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: theme.bgCard,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  headerTitle: { fontSize: 22, fontWeight: "bold", color: theme.text },
-  headerSub: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  dot: { width: 7, height: 7, borderRadius: 4, marginRight: 5 },
-  badgeText: { fontSize: 12, fontWeight: "600" },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+    logoCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: theme.bgCard,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    headerTitle: { fontSize: 22, fontWeight: "bold", color: theme.text },
+    headerSub: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
+    badge: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 20,
+    },
+    dot: { width: 7, height: 7, borderRadius: 4, marginRight: 5 },
+    badgeText: { fontSize: 12, fontWeight: "600" },
 
-  waitingCard: {
-    backgroundColor: theme.bgCard,
-    borderRadius: 16,
-    padding: 28,
-    alignItems: "center",
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  waitingTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: theme.text,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  waitingSub: { fontSize: 13, color: theme.textMuted, textAlign: "center" },
+    waitingCard: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 16,
+      padding: 28,
+      alignItems: "center",
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    waitingTitle: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: theme.text,
+      marginTop: 10,
+      marginBottom: 4,
+    },
+    waitingSub: { fontSize: 13, color: theme.textMuted, textAlign: "center" },
 
-  card: {
-    backgroundColor: theme.bgCard,
-    padding: 16,
-    borderRadius: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  cardHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  cardTitle: { fontSize: 16, fontWeight: "bold", color: theme.text },
-  angleChip: {
-    backgroundColor: theme.bgCardAlt,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  angleChipText: { color: theme.primary, fontSize: 13, fontWeight: "600" },
+    card: {
+      backgroundColor: theme.bgCard,
+      padding: 16,
+      borderRadius: 18,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    cardHeaderRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    cardTitle: { fontSize: 16, fontWeight: "bold", color: theme.text },
+    angleChip: {
+      backgroundColor: theme.bgCardAlt,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    angleChipText: { color: theme.primary, fontSize: 13, fontWeight: "600" },
 
-  rotateBtn: {
-    marginTop: 14,
-    borderRadius: 14,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  rotateBtnStart: {
-    backgroundColor: theme.bgCardAlt,
-    borderWidth: 1.5,
-    borderColor: theme.primary,
-  },
-  rotateBtnStop: { backgroundColor: theme.danger },
-  rotateBtnDisabled: { opacity: 0.4 },
-  rotateBtnText: { fontSize: 16, fontWeight: "bold" },
+    rotateBtn: {
+      marginTop: 14,
+      borderRadius: 14,
+      paddingVertical: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    rotateBtnStart: {
+      backgroundColor: theme.bgCardAlt,
+      borderWidth: 1.5,
+      borderColor: theme.primary,
+    },
+    rotateBtnStop: { backgroundColor: theme.danger },
+    rotateBtnDisabled: { opacity: 0.4 },
+    rotateBtnText: { fontSize: 16, fontWeight: "bold" },
 
-  metricsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 14,
-    gap: 10,
-  },
+    metricsRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 14,
+      gap: 10,
+    },
 
-  reconnectText: {
-    color: theme.warning,
-    fontSize: 12,
-    fontWeight: "bold",
-    marginTop: 6,
-  },
+    reconnectText: {
+      color: theme.warning,
+      fontSize: 12,
+      fontWeight: "bold",
+      marginTop: 6,
+    },
 
-  deviceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: -6,
-    marginBottom: 14,
-    paddingHorizontal: 2,
-  },
-  deviceText: { fontSize: 12, color: theme.textMuted },
-  deviceDivider: { fontSize: 12, color: theme.textFaint },
-});
+    deviceRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: -6,
+      marginBottom: 14,
+      paddingHorizontal: 2,
+    },
+    deviceText: { fontSize: 12, color: theme.textMuted },
+    deviceDivider: { fontSize: 12, color: theme.textFaint },
+  });
 
 const AppWrapper = () => (
   <SafeAreaProvider>
