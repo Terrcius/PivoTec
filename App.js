@@ -22,12 +22,14 @@ import DetailedGraphsPage from "./components/DetailedGraphsPage";
 import SchedulePage from "./components/SchedulePage";
 import ProfilePage from "./components/ProfilePage";
 import BottomNav from "./components/BottomNav";
+import SectorManager from "./components/SectorManager";
 
 import { configureAWS } from "./services/awsConfig";
 import { iotService } from "./services/iotService";
 import { dynamoDBService } from "./services/dynamoDBService";
 import { darkTheme, lightTheme } from "./theme";
 import { t } from "./i18n";
+import { cropById, cropName, MIN_SECTORS, MAX_SECTORS } from "./crops";
 
 configureAWS();
 
@@ -47,12 +49,20 @@ const ConfigPage = ({
 }) => {
   const insets = useSafeAreaInsets();
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top }}>
+    <View
+      style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top }}
+    >
       <View style={cs(theme).header}>
         <Text style={cs(theme).headerTitle}>{t(lang, "control")}</Text>
         <Text style={cs(theme).headerSub}>{t(lang, "manual_operation")}</Text>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 24 }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: 16,
+          paddingTop: 4,
+          paddingBottom: 24,
+        }}
+      >
         <MainControls
           status={pivotData?.status?.rotation_status}
           direction={pivotData?.status?.direction}
@@ -93,6 +103,7 @@ const App = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
   const [deviceInfo, setDeviceInfo] = useState({ ip: null, ver: null });
+  const [sectorModal, setSectorModal] = useState(false);
 
   // ── Tema e Idioma ──
   const [isDark, setIsDark] = useState(true);
@@ -173,7 +184,10 @@ const App = () => {
         handleIoTMessage,
         (err) => {
           setIsConnected(false);
-          console.warn("[App] ⚠️ Conexão MQTT interrompida:", err?.message || err);
+          console.warn(
+            "[App] ⚠️ Conexão MQTT interrompida:",
+            err?.message || err,
+          );
         },
       );
     } catch (err) {
@@ -189,7 +203,9 @@ const App = () => {
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastMessageRef.current;
       if (elapsed > TIMEOUT && isConnected) {
-        console.warn(`[App] ⏱️ Sem mensagens há ${Math.round(elapsed / 1000)}s → Offline`);
+        console.warn(
+          `[App] ⏱️ Sem mensagens há ${Math.round(elapsed / 1000)}s → Offline`,
+        );
         setIsConnected(false);
       }
     }, 15_000);
@@ -312,6 +328,71 @@ const App = () => {
     [pivotData, isConnected, pivotId],
   );
 
+  const handleAddSector = useCallback(() => {
+    setPivotData((p) => {
+      if (!p) return p;
+      const keys = Object.keys(p.sectors);
+      if (keys.length >= MAX_SECTORS) return p;
+      // Próximo índice livre (1..4)
+      let idx = 1;
+      while (p.sectors[`sector_${idx}`]) idx += 1;
+      const crop = cropById("milho");
+      const sectors = {
+        ...p.sectors,
+        [`sector_${idx}`]: {
+          cropId: crop.id,
+          crop: cropName("pt", crop.id),
+          color: crop.color,
+          moisture: 0,
+          is_active: false,
+        },
+      };
+      dynamoDBService
+        .updateSectors(pivotId || "pivot_001", sectors)
+        .catch(console.error);
+      return { ...p, sectors };
+    });
+  }, [pivotId]);
+
+  const handleChangeCrop = useCallback(
+    (key, cropId) => {
+      setPivotData((p) => {
+        if (!p?.sectors?.[key]) return p;
+        const crop = cropById(cropId);
+        const sectors = {
+          ...p.sectors,
+          [key]: {
+            ...p.sectors[key],
+            cropId: crop.id,
+            crop: cropName("pt", crop.id),
+            color: crop.color,
+          },
+        };
+        dynamoDBService
+          .updateSectors(pivotId || "pivot_001", sectors)
+          .catch(console.error);
+        return { ...p, sectors };
+      });
+    },
+    [pivotId],
+  );
+
+  const handleDeleteSector = useCallback(
+    (key) => {
+      setPivotData((p) => {
+        if (!p?.sectors?.[key]) return p;
+        if (Object.keys(p.sectors).length <= MIN_SECTORS) return p;
+        const sectors = { ...p.sectors };
+        delete sectors[key];
+        dynamoDBService
+          .updateSectors(pivotId || "pivot_001", sectors)
+          .catch(console.error);
+        return { ...p, sectors };
+      });
+    },
+    [pivotId],
+  );
+
   const openGraph = useCallback((type) => {
     setGraphType(type);
     setView("dados");
@@ -350,7 +431,9 @@ const App = () => {
   } else if (view === "schedule") {
     screen = <SchedulePage theme={theme} lang={lang} />;
   } else if (view === "dados") {
-    screen = <DetailedGraphsPage initialType={graphType} theme={theme} lang={lang} />;
+    screen = (
+      <DetailedGraphsPage initialType={graphType} theme={theme} lang={lang} />
+    );
   } else if (view === "perfil") {
     screen = (
       <ProfilePage
@@ -395,7 +478,9 @@ const App = () => {
               <View
                 style={[
                   st.dot,
-                  { backgroundColor: isConnected ? theme.primary : theme.danger },
+                  {
+                    backgroundColor: isConnected ? theme.primary : theme.danger,
+                  },
                 ]}
               />
               <Text
@@ -412,7 +497,11 @@ const App = () => {
           {/* Info do dispositivo */}
           {pivotId && (deviceInfo.ip || deviceInfo.ver) && (
             <View style={st.deviceRow}>
-              <Ionicons name="hardware-chip-outline" size={15} color={theme.textMuted} />
+              <Ionicons
+                name="hardware-chip-outline"
+                size={15}
+                color={theme.textMuted}
+              />
               {deviceInfo.ip && (
                 <Text style={st.deviceText}>IP {deviceInfo.ip}</Text>
               )}
@@ -420,7 +509,9 @@ const App = () => {
                 <Text style={st.deviceDivider}>·</Text>
               )}
               {deviceInfo.ver && (
-                <Text style={st.deviceText}>{t(lang, "firmware")} v{deviceInfo.ver}</Text>
+                <Text style={st.deviceText}>
+                  {t(lang, "firmware")} v{deviceInfo.ver}
+                </Text>
               )}
             </View>
           )}
@@ -429,7 +520,9 @@ const App = () => {
           {!pivotId && (
             <View style={st.waitingCard}>
               <Ionicons name="wifi-outline" size={36} color={theme.textMuted} />
-              <Text style={st.waitingTitle}>{t(lang, "waiting_connection")}</Text>
+              <Text style={st.waitingTitle}>
+                {t(lang, "waiting_connection")}
+              </Text>
               <Text style={st.waitingSub}>{t(lang, "waiting_sub")}</Text>
             </View>
           )}
@@ -439,7 +532,9 @@ const App = () => {
             <View style={st.cardHeaderRow}>
               <Text style={st.cardTitle}>{t(lang, "pivot_position")}</Text>
               <View style={st.angleChip}>
-                <Text style={st.angleChipText}>{Math.round(currentAngle)}°</Text>
+                <Text style={st.angleChipText}>
+                  {Math.round(currentAngle)}°
+                </Text>
               </View>
             </View>
             <PivotVisualization
@@ -467,7 +562,9 @@ const App = () => {
                   { color: isRotating ? "#FFF" : theme.primary },
                 ]}
               >
-                {isRotating ? t(lang, "stop_rotation") : t(lang, "start_rotation")}
+                {isRotating
+                  ? t(lang, "stop_rotation")
+                  : t(lang, "start_rotation")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -514,7 +611,21 @@ const App = () => {
 
           {/* Setores */}
           <View style={st.card}>
-            <Text style={st.cardTitle}>{t(lang, "sector_status")}</Text>
+            <View style={st.cardHeaderRow}>
+              <Text style={st.cardTitle}>{t(lang, "sector_status")}</Text>
+              <TouchableOpacity
+                style={st.manageBtn}
+                onPress={() => setSectorModal(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={16}
+                  color={theme.primary}
+                />
+                <Text style={st.manageBtnText}>{t(lang, "manage")}</Text>
+              </TouchableOpacity>
+            </View>
             {!isConnected && (
               <Text style={st.reconnectText}>{t(lang, "connecting_mqtt")}</Text>
             )}
@@ -526,7 +637,9 @@ const App = () => {
                   return (
                     <StatusCard
                       key={key}
-                      label={s.crop || key}
+                      label={
+                        s.cropId ? cropName(lang, s.cropId) : s.crop || key
+                      }
                       value={`${s.moisture ?? 0}%`}
                       status={s.is_active}
                       color={s.color}
@@ -539,6 +652,17 @@ const App = () => {
             </View>
           </View>
         </ScrollView>
+
+        <SectorManager
+          visible={sectorModal}
+          onClose={() => setSectorModal(false)}
+          sectors={pivotData.sectors}
+          onAddSector={handleAddSector}
+          onChangeCrop={handleChangeCrop}
+          onDeleteSector={handleDeleteSector}
+          theme={theme}
+          lang={lang}
+        />
       </View>
     );
   }
@@ -566,8 +690,20 @@ const buildDefaultData = () => ({
     uv_intensity: 0,
   },
   sectors: {
-    sector_1: { crop: "Milho", moisture: 70, is_active: false, color: "#FBBF24" },
-    sector_2: { crop: "Soja", moisture: 65, is_active: true, color: "#34D399" },
+    sector_1: {
+      cropId: "milho",
+      crop: "Milho",
+      moisture: 70,
+      is_active: false,
+      color: "#FBBF24",
+    },
+    sector_2: {
+      cropId: "soja",
+      crop: "Soja",
+      moisture: 65,
+      is_active: true,
+      color: "#34D399",
+    },
   },
   sensors: { temperature: 30, soil_humidity: 68, air_humidity: 55 },
 });
@@ -688,6 +824,19 @@ const styles = (theme) =>
       fontWeight: "bold",
       marginTop: 6,
     },
+
+    manageBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: theme.bgCardAlt,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    manageBtnText: { fontSize: 12, fontWeight: "600", color: theme.primary },
 
     deviceRow: {
       flexDirection: "row",

@@ -22,12 +22,19 @@ const DEFAULTS = {
   },
   sectors: {
     sector_1: {
+      cropId: "milho",
       crop: "Milho",
       moisture: 70,
       is_active: false,
       color: "#FBBF24",
     },
-    sector_2: { crop: "Soja", moisture: 65, is_active: true, color: "#34D399" },
+    sector_2: {
+      cropId: "soja",
+      crop: "Soja",
+      moisture: 65,
+      is_active: true,
+      color: "#34D399",
+    },
   },
   sensors: { temperature: 30, soil_humidity: 68, air_humidity: 55 },
 };

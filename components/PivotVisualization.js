@@ -1,167 +1,121 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
+import Svg, { Path, Circle, G, Line } from "react-native-svg";
+
+const CX = 50;
+const CY = 50;
+const R = 40; // raio do anel (linha central do traço)
+const STROKE = 11; // espessura do anel
+
+// Converte #RRGGBB + alpha em rgba()
+const hexToRgba = (hex, a) => {
+  const h = (hex || "#22C55E").replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+};
+
+// Ponto na circunferência (0° = topo, sentido horário)
+const polar = (cx, cy, r, deg) => {
+  const rad = ((deg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+};
+
+// Caminho de um arco entre dois ângulos
+const arcPath = (cx, cy, r, startDeg, endDeg) => {
+  const start = polar(cx, cy, r, startDeg);
+  const end = polar(cx, cy, r, endDeg);
+  const largeArc = endDeg - startDeg <= 180 ? 0 : 1;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+};
 
 const PivotVisualization = ({ angle, sectors = {}, theme }) => {
-  const pivotContainerStyle = { transform: [{ rotate: `${angle}deg` }] };
-  const sectorKeys = Object.keys(sectors).sort();
+  const keys = Object.keys(sectors).sort();
+  const n = Math.max(keys.length, 1);
+  const gap = n > 1 ? 6 : 0; // separação visual entre setores (graus)
+  const seg = 360 / n;
+  const armLen = R - STROKE / 2;
 
-  const getSector = (index) => {
-    if (sectorKeys[index]) {
-      const sector = sectors[sectorKeys[index]];
-      return {
-        is_active: sector.is_active,
-        color: sector.color || theme.primary,
-      };
-    }
-    return { is_active: false, color: theme.bgCardAlt };
+  const colorFor = (s) => {
+    const c = s?.color || theme.primary;
+    return s?.is_active ? c : hexToRgba(c, 0.22);
   };
 
-  const arcs = [getSector(0), getSector(1), getSector(2), getSector(3)];
-  const separators = [0, 1];
-
   return (
-    <View style={styles(theme).container}>
-      <View style={styles(theme).visualizationWrapper}>
-        <View style={styles(theme).arcsContainer}>
-          {arcs.map((arc, index) => (
-            <View
-              key={`arc-${index}`}
-              style={[
-                styles(theme).arcWrapper,
-                { transform: [{ rotate: `${index * 90}deg` }] },
-              ]}
-            >
-              <View
-                style={[
-                  styles(theme).arc,
-                  {
-                    borderTopColor: arc.is_active
-                      ? arc.color
-                      : theme.bgCardAlt,
-                  },
-                ]}
-              />
-            </View>
-          ))}
-        </View>
-        <View style={styles(theme).separatorsContainer}>
-          {separators.map((_, index) => (
-            <View
-              key={`sep-${index}`}
-              style={[
-                styles(theme).separatorLine,
-                { transform: [{ rotate: `${index * 90}deg` }] },
-              ]}
+    <View style={styles.container}>
+      <Svg width={180} height={180} viewBox="0 0 100 100">
+        {/* Anel base (fundo) */}
+        <Circle
+          cx={CX}
+          cy={CY}
+          r={R}
+          stroke={theme.bgCardAlt}
+          strokeWidth={STROKE}
+          fill="none"
+        />
+
+        {/* Setores */}
+        {n === 1 ? (
+          <Circle
+            cx={CX}
+            cy={CY}
+            r={R}
+            stroke={colorFor(sectors[keys[0]])}
+            strokeWidth={STROKE}
+            fill="none"
+          />
+        ) : (
+          keys.map((k, i) => (
+            <Path
+              key={k}
+              d={arcPath(CX, CY, R, i * seg + gap / 2, (i + 1) * seg - gap / 2)}
+              stroke={colorFor(sectors[k])}
+              strokeWidth={STROKE}
+              strokeLinecap="butt"
+              fill="none"
             />
-          ))}
-        </View>
-        <View style={styles(theme).innerBase} />
-        <View style={[styles(theme).pivotArmContainer, pivotContainerStyle]}>
-          <View style={styles(theme).pivotArm}>
-            <View style={styles(theme).pivotTip} />
-          </View>
-        </View>
-        <View style={styles(theme).centerCircle} />
-      </View>
+          ))
+        )}
+
+        {/* Base interna */}
+        <Circle
+          cx={CX}
+          cy={CY}
+          r={R - STROKE}
+          fill={theme.bgCardAlt}
+          stroke={theme.border}
+          strokeWidth={0.5}
+        />
+
+        {/* Braço rotativo do pivô */}
+        <G rotation={angle} origin={`${CX}, ${CY}`}>
+          <Line
+            x1={CX}
+            y1={CY}
+            x2={CX}
+            y2={CY - armLen}
+            stroke={theme.primary}
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+          <Circle cx={CX} cy={CY - armLen} r={3.5} fill={theme.primaryDark} />
+        </G>
+
+        {/* Centro */}
+        <Circle cx={CX} cy={CY} r={3.5} fill={theme.text} />
+      </Svg>
     </View>
   );
 };
 
-const styles = (theme) =>
-  StyleSheet.create({
-    container: {
-      alignItems: "center",
-      justifyContent: "center",
-      width: "100%",
-      paddingVertical: 20,
-    },
-    visualizationWrapper: {
-      width: 170,
-      height: 170,
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-    },
-    arcsContainer: {
-      position: "absolute",
-      width: "100%",
-      height: "100%",
-      zIndex: 1,
-    },
-    arcWrapper: {
-      width: "100%",
-      height: "100%",
-      position: "absolute",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    arc: {
-      width: "100%",
-      height: "100%",
-      borderRadius: 85,
-      borderWidth: 12,
-      borderBottomColor: "transparent",
-      borderLeftColor: "transparent",
-      borderRightColor: "transparent",
-      transform: [{ rotate: "-45deg" }],
-    },
-    separatorsContainer: {
-      position: "absolute",
-      width: "100%",
-      height: "100%",
-      zIndex: 2,
-    },
-    separatorLine: {
-      position: "absolute",
-      left: "50%",
-      top: 0,
-      marginLeft: -1.5,
-      width: 3,
-      height: "100%",
-      backgroundColor: theme.bgCard,
-    },
-    innerBase: {
-      width: 130,
-      height: 130,
-      borderRadius: 65,
-      backgroundColor: theme.bgCardAlt,
-      borderWidth: 1,
-      borderColor: theme.border,
-      zIndex: 3,
-    },
-    pivotArmContainer: {
-      position: "absolute",
-      width: 130,
-      height: 130,
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 4,
-    },
-    pivotArm: {
-      width: "48%",
-      height: 6,
-      backgroundColor: theme.primary,
-      borderRadius: 3,
-      position: "absolute",
-      left: "50%",
-    },
-    pivotTip: {
-      width: 14,
-      height: 14,
-      borderRadius: 7,
-      backgroundColor: theme.primaryDark,
-      position: "absolute",
-      right: -7,
-      top: -4,
-    },
-    centerCircle: {
-      width: 15,
-      height: 15,
-      borderRadius: 7.5,
-      backgroundColor: theme.text,
-      position: "absolute",
-      zIndex: 5,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    paddingVertical: 16,
+  },
+});
 
 export default PivotVisualization;
