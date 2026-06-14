@@ -37,6 +37,24 @@ export const translations = {
     waiting_sub: "Ligue o pivô e aguarde a conexão via MQTT",
     firmware: "Firmware",
 
+    // Setorização
+    sectorization: "Setorização",
+    sectorization_on: "Setorização Ativa",
+    sectorization_off: "Setorização Desativada",
+    sectorization_desc_on:
+      "O pivô segue as configurações de cada setor automaticamente. Controles manuais estão bloqueados.",
+    sectorization_desc_off:
+      "Ative para configurar cada setor individualmente. O pivô se adequará ao chegar em cada um.",
+    sector_config: "Configuração do Setor",
+    sector_active: "Setor ativo",
+    sector_inactive: "Setor inativo",
+    sector_vel: "Velocidade",
+    sector_luz: "Luminosidade UV",
+    sector_vazao: "Vazão da Água",
+    manual_blocked: "Controle manual bloqueado pela setorização",
+    transit_speed: "Velocidade de Trânsito",
+    transit_desc: "Velocidade ao atravessar setores desligados",
+
     // Métricas (tela inicial)
     temperature: "Temperatura",
     soil_humidity: "Umid. Solo",
@@ -184,7 +202,25 @@ export const translations = {
     waiting_sub: "Turn on the pivot and wait for MQTT connection",
     firmware: "Firmware",
 
-    // Métricas (home screen)
+    // Sectorization
+    sectorization: "Sectorization",
+    sectorization_on: "Sectorization Active",
+    sectorization_off: "Sectorization Disabled",
+    sectorization_desc_on:
+      "The pivot follows each sector's settings automatically. Manual controls are locked.",
+    sectorization_desc_off:
+      "Enable to configure each sector individually. The pivot will adjust when it reaches each one.",
+    sector_config: "Sector Configuration",
+    sector_active: "Sector active",
+    sector_inactive: "Sector inactive",
+    sector_vel: "Speed",
+    sector_luz: "UV Light",
+    sector_vazao: "Water Flow",
+    manual_blocked: "Manual control locked by sectorization",
+    transit_speed: "Transit Speed",
+    transit_desc: "Speed when crossing inactive sectors",
+
+    // Metrics (home screen)
     temperature: "Temperature",
     soil_humidity: "Soil Hum.",
     air_humidity: "Air Hum.",

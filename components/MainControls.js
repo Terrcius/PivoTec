@@ -14,15 +14,9 @@ import { t } from "../i18n";
 // ─── Botão animado ────────────────────────────────────────────────────────────
 const AnimatedButton = ({ onPress, disabled, style, children }) => {
   const scale = useRef(new Animated.Value(1)).current;
-  const onIn = () =>
-    Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
+  const onIn  = () => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
   const onOut = () =>
-    Animated.spring(scale, {
-      toValue: 1.0,
-      useNativeDriver: true,
-      tension: 300,
-      friction: 7,
-    }).start();
+    Animated.spring(scale, { toValue: 1.0, useNativeDriver: true, tension: 300, friction: 7 }).start();
   return (
     <Animated.View style={[{ transform: [{ scale }] }, style]}>
       <TouchableOpacity
@@ -40,37 +34,24 @@ const AnimatedButton = ({ onPress, disabled, style, children }) => {
 };
 
 // ─── Botão de grade ───────────────────────────────────────────────────────────
-const GridButton = ({
-  icon,
-  title,
-  subtitle,
-  active,
-  disabled,
-  variant,
-  accent,
-  theme,
-}) => {
-  const stop = variant === "stop";
+const GridButton = ({ icon, title, subtitle, active, disabled, variant, accent, theme }) => {
+  const stop  = variant === "stop";
   const start = variant === "start";
   const s = styles(theme);
   return (
-    <View
-      style={[
-        s.gridBtn,
-        stop && s.gridBtnStop,
-        start && s.gridBtnStart,
-        active && !stop && s.gridBtnActive,
-        disabled && s.gridBtnDisabled,
-      ]}
-    >
+    <View style={[
+      s.gridBtn,
+      stop  && s.gridBtnStop,
+      start && s.gridBtnStart,
+      active && !stop && s.gridBtnActive,
+      disabled && s.gridBtnDisabled,
+    ]}>
       {icon}
-      <Text
-        style={[
-          s.gridTitle,
-          stop && { color: "#FFFFFF" },
-          active && accent ? { color: accent } : null,
-        ]}
-      >
+      <Text style={[
+        s.gridTitle,
+        stop && { color: "#FFFFFF" },
+        active && accent ? { color: accent } : null,
+      ]}>
         {title}
       </Text>
       <Text style={[s.gridSub, stop && { color: "rgba(255,255,255,0.8)" }]}>
@@ -96,37 +77,34 @@ const MainControls = ({
   onChangeUVIntensity,
   isConnected,
   onZeroPosition,
+  setorizacaoAtiva, // ← novo prop
   theme,
   lang,
 }) => {
-  const isRotating = status === "Rodando";
+  const isRotating      = status === "Rodando";
   const isAntiClockwise = direction === "Anti-horário";
-  const isUVOn = uvLightStatus === "Ligada";
+  const isUVOn          = uvLightStatus === "Ligada";
+
+  // Quando setorização está ativa os controles manuais são bloqueados pelo firmware,
+  // então bloqueamos também na UI para evitar confusão.
+  const manualBlocked = !!setorizacaoAtiva;
+  const canControl    = isConnected && !manualBlocked;
 
   const [localPower, setLocalPower] = useState(power);
-  const [localFlow, setLocalFlow] = useState(waterFlow);
-  const [localUV, setLocalUV] = useState(uvIntensity);
-  useEffect(() => setLocalPower(power), [power]);
-  useEffect(() => setLocalFlow(waterFlow), [waterFlow]);
-  useEffect(() => setLocalUV(uvIntensity), [uvIntensity]);
+  const [localFlow,  setLocalFlow]  = useState(waterFlow);
+  const [localUV,    setLocalUV]    = useState(uvIntensity);
+  useEffect(() => setLocalPower(power),     [power]);
+  useEffect(() => setLocalFlow(waterFlow),  [waterFlow]);
+  useEffect(() => setLocalUV(uvIntensity),  [uvIntensity]);
 
+  // Pulso no botão "Rodando"
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (isRotating) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.04,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1.0,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
+          Animated.timing(pulseAnim, { toValue: 1.04, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.0,  duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ]),
       ).start();
     } else {
@@ -136,7 +114,7 @@ const MainControls = ({
   }, [isRotating]);
 
   const iconColor = (activeColor, on) =>
-    !isConnected ? theme.textFaint : on ? activeColor : theme.textMuted;
+    !canControl ? theme.textFaint : on ? activeColor : theme.textMuted;
 
   const s = styles(theme);
 
@@ -149,12 +127,20 @@ const MainControls = ({
         </Text>
       </View>
 
+      {/* Aviso de bloqueio quando setorização ativa */}
+      {manualBlocked && (
+        <View style={s.blockedBanner}>
+          <Ionicons name="lock-closed-outline" size={14} color={theme.warning} />
+          <Text style={s.blockedText}>{t(lang, "manual_blocked")}</Text>
+        </View>
+      )}
+
       {/* ── LINHA 1: Rotação + Direção ── */}
       <View style={s.row}>
         <Animated.View style={[{ flex: 1, transform: [{ scale: pulseAnim }] }]}>
           <TouchableOpacity
             onPress={onToggleRotation}
-            disabled={!isConnected}
+            disabled={!isConnected} // Rotação sempre permitida mesmo com setorização
             activeOpacity={0.85}
           >
             <GridButton
@@ -168,9 +154,7 @@ const MainControls = ({
                   color={
                     isRotating
                       ? "#FFFFFF"
-                      : isConnected
-                        ? theme.primary
-                        : theme.textFaint
+                      : isConnected ? theme.primary : theme.textFaint
                   }
                 />
               }
@@ -183,12 +167,12 @@ const MainControls = ({
         <AnimatedButton
           style={{ flex: 1, marginLeft: 10 }}
           onPress={onToggleDirection}
-          disabled={!isConnected}
+          disabled={!canControl}
         >
           <GridButton
             theme={theme}
             variant="secondary"
-            disabled={!isConnected}
+            disabled={!canControl}
             active={isAntiClockwise}
             accent={theme.accentBlue}
             icon={
@@ -198,9 +182,7 @@ const MainControls = ({
                 color={iconColor(theme.accentBlue, isAntiClockwise)}
               />
             }
-            title={
-              isAntiClockwise ? t(lang, "anticlockwise") : t(lang, "clockwise")
-            }
+            title={isAntiClockwise ? t(lang, "anticlockwise") : t(lang, "clockwise")}
             subtitle={t(lang, "direction")}
           />
         </AnimatedButton>
@@ -211,12 +193,12 @@ const MainControls = ({
         <AnimatedButton
           style={{ flex: 1 }}
           onPress={onToggleUVLight}
-          disabled={!isConnected}
+          disabled={!canControl}
         >
           <GridButton
             theme={theme}
             variant="secondary"
-            disabled={!isConnected}
+            disabled={!canControl}
             active={isUVOn}
             accent={theme.accentAmber}
             icon={
@@ -244,9 +226,7 @@ const MainControls = ({
               <MaterialCommunityIcons
                 name="target"
                 size={24}
-                color={
-                  !isConnected || isRotating ? theme.textFaint : theme.primary
-                }
+                color={!isConnected || isRotating ? theme.textFaint : theme.primary}
               />
             }
             title={t(lang, "reposition")}
@@ -257,12 +237,12 @@ const MainControls = ({
 
       <View style={s.divider} />
 
-      {/* ── Sliders ── */}
+      {/* ── Sliders — bloqueados quando setorização ativa ── */}
       <SliderRow
         label={t(lang, "water_flow_slider")}
         value={localFlow}
         tintColor={theme.accentBlue}
-        disabled={!isConnected}
+        disabled={!canControl}
         onChange={setLocalFlow}
         onComplete={onChangeFlow}
         icon="💧"
@@ -272,7 +252,7 @@ const MainControls = ({
         label={t(lang, "uv_intensity")}
         value={localUV}
         tintColor={theme.accentAmber}
-        disabled={!isConnected}
+        disabled={!canControl}
         onChange={setLocalUV}
         onComplete={onChangeUVIntensity}
         icon="☀️"
@@ -282,7 +262,7 @@ const MainControls = ({
         label={t(lang, "rotation_power")}
         value={localPower}
         tintColor={theme.primary}
-        disabled={!isConnected}
+        disabled={!canControl}
         onChange={setLocalPower}
         onComplete={onChangePower}
         icon="⚡"
@@ -292,30 +272,13 @@ const MainControls = ({
   );
 };
 
-// ─── Slider ───────────────────────────────────────────────────────────────────
-const SliderRow = ({
-  label,
-  value,
-  tintColor,
-  disabled,
-  onChange,
-  onComplete,
-  icon,
-  theme,
-}) => {
+// ─── Slider com animação de label ─────────────────────────────────────────────
+const SliderRow = ({ label, value, tintColor, disabled, onChange, onComplete, icon, theme }) => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const flash = () => {
     Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0.4,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1.0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 0.4, duration: 80,  useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1.0, duration: 150, useNativeDriver: true }),
     ]).start();
   };
   const s = styles(theme);
@@ -324,9 +287,7 @@ const SliderRow = ({
       <View style={s.sliderLabelRow}>
         <Text style={s.sliderIcon}>{icon}</Text>
         <Text style={s.sliderLabel}>{label}</Text>
-        <Animated.Text
-          style={[s.sliderValue, { color: tintColor, opacity: fadeAnim }]}
-        >
+        <Animated.Text style={[s.sliderValue, { color: tintColor, opacity: fadeAnim }]}>
           {Math.round(value)}%
         </Animated.Text>
       </View>
@@ -338,10 +299,7 @@ const SliderRow = ({
         maximumTrackTintColor={theme.track}
         thumbTintColor={tintColor}
         value={value}
-        onValueChange={(v) => {
-          onChange(v);
-          flash();
-        }}
+        onValueChange={(v) => { onChange(v); flash(); }}
         onSlidingComplete={onComplete}
         disabled={disabled}
       />
@@ -366,8 +324,23 @@ const styles = (theme) =>
       alignItems: "center",
       marginBottom: 14,
     },
-    cardTitle: { fontSize: 16, fontWeight: "bold", color: theme.text },
+    cardTitle:  { fontSize: 16, fontWeight: "bold", color: theme.text },
     statusText: { fontSize: 13, fontWeight: "600", color: theme.textMuted },
+
+    // Banner de bloqueio
+    blockedBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: theme.warningSoft,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: theme.warning,
+    },
+    blockedText: { fontSize: 12, fontWeight: "600", color: theme.warning, flex: 1 },
 
     row: { flexDirection: "row", marginBottom: 10 },
 
@@ -382,20 +355,12 @@ const styles = (theme) =>
       borderWidth: 1,
       borderColor: theme.border,
     },
-    gridBtnStart: {
-      backgroundColor: theme.primarySoft,
-      borderColor: theme.primary,
-    },
-    gridBtnStop: { backgroundColor: theme.danger, borderColor: theme.danger },
-    gridBtnActive: { borderColor: theme.primary },
+    gridBtnStart:    { backgroundColor: theme.primarySoft, borderColor: theme.primary },
+    gridBtnStop:     { backgroundColor: theme.danger, borderColor: theme.danger },
+    gridBtnActive:   { borderColor: theme.primary },
     gridBtnDisabled: { opacity: 0.45 },
-    gridTitle: {
-      fontSize: 15,
-      fontWeight: "bold",
-      color: theme.text,
-      marginTop: 10,
-    },
-    gridSub: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
+    gridTitle: { fontSize: 15, fontWeight: "bold", color: theme.text, marginTop: 10 },
+    gridSub:   { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
     divider: {
       height: 1,
@@ -411,21 +376,11 @@ const styles = (theme) =>
       marginBottom: 2,
       gap: 6,
     },
-    sliderIcon: { fontSize: 14 },
-    sliderLabel: {
-      flex: 1,
-      fontSize: 13,
-      fontWeight: "600",
-      color: theme.text,
-    },
-    sliderValue: {
-      fontSize: 13,
-      fontWeight: "bold",
-      minWidth: 36,
-      textAlign: "right",
-    },
-    slider: { width: "100%", height: 36 },
-    sliderOff: { width: "100%", height: 36, opacity: 0.4 },
+    sliderIcon:  { fontSize: 14 },
+    sliderLabel: { flex: 1, fontSize: 13, fontWeight: "600", color: theme.text },
+    sliderValue: { fontSize: 13, fontWeight: "bold", minWidth: 36, textAlign: "right" },
+    slider:      { width: "100%", height: 36 },
+    sliderOff:   { width: "100%", height: 36, opacity: 0.4 },
   });
 
 export default MainControls;
