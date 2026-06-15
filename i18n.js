@@ -38,10 +38,11 @@ export const translations = {
     waiting_sub: "Ligue o pivô e aguarde a conexão via MQTT",
     firmware: "Firmware",
 
-    // Métricas
+    // Métricas (tela inicial)
     temperature: "Temperatura",
     soil_humidity: "Umid. Solo",
     air_humidity: "Umid. Ar",
+    water_flow: "Vazão",
 
     // ConfigPage
     control: "Controle",
@@ -62,7 +63,7 @@ export const translations = {
     uv_off: "Desligada",
     reposition: "Reposicionar",
     initial_position: "Posição Inicial",
-    water_flow: "Vazão da Água",
+    water_flow_slider: "Vazão da Água",
     uv_intensity: "Intensidade UV",
     rotation_power: "Potência da Rotação",
 
@@ -109,6 +110,16 @@ export const translations = {
     history_label: "Histórico — últimas ",
     no_data: "Sem dados para este período",
     no_data_sub: "Os dados aparecerão conforme os sensores enviam leituras",
+
+    // Novos sensores
+    water_flow_sensor: "Vazão",
+    water_flow_unit: "L/min",
+    rain: "Chuva",
+    rain_unit: "%",
+    light: "Luminosidade",
+    light_unit: "%",
+    rain_note: "≥50% pausa a irrigação",
+    light_note: "<30% liga o LED",
 
     // ProfilePage
     profile: "Perfil",
@@ -187,10 +198,11 @@ export const translations = {
     waiting_sub: "Turn on the pivot and wait for MQTT connection",
     firmware: "Firmware",
 
-    // Métricas
+    // Métricas (home screen)
     temperature: "Temperature",
     soil_humidity: "Soil Hum.",
     air_humidity: "Air Hum.",
+    water_flow: "Flow Rate",
 
     // ConfigPage
     control: "Control",
@@ -211,7 +223,7 @@ export const translations = {
     uv_off: "Off",
     reposition: "Reposition",
     initial_position: "Home Position",
-    water_flow: "Water Flow",
+    water_flow_slider: "Water Flow",
     uv_intensity: "UV Intensity",
     rotation_power: "Rotation Power",
 
@@ -258,6 +270,16 @@ export const translations = {
     history_label: "History — last ",
     no_data: "No data for this period",
     no_data_sub: "Data will appear as sensors send readings",
+
+    // New sensors
+    water_flow_sensor: "Flow Rate",
+    water_flow_unit: "L/min",
+    rain: "Rain",
+    rain_unit: "%",
+    light: "Light",
+    light_unit: "%",
+    rain_note: "≥50% pauses irrigation",
+    light_note: "<30% turns LED on",
 
     // ProfilePage
     profile: "Profile",

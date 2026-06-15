@@ -126,6 +126,7 @@ const App = () => {
     (msg) => {
       lastMessageRef.current = Date.now();
       if (msg.id && !pivotId) setPivotId(msg.id);
+
       if (msg.online !== undefined) {
         setIsConnected(!!msg.online);
         setDeviceInfo((d) => ({
@@ -134,12 +135,19 @@ const App = () => {
         }));
         return;
       }
+
       setIsConnected(true);
       if (msg.ang !== undefined) setCurrentAngle(parseFloat(msg.ang));
+
       const patch = {};
       if (msg.temp !== undefined) patch.temperature = parseFloat(msg.temp);
       if (msg.umid !== undefined) patch.air_humidity = parseFloat(msg.umid);
       if (msg.solo !== undefined) patch.soil_humidity = parseFloat(msg.solo);
+      // ── Novos campos da telemetria ──
+      if (msg.vazao !== undefined) patch.water_flow_sensor = parseFloat(msg.vazao);
+      if (msg.chuva !== undefined) patch.rain = parseFloat(msg.chuva);
+      if (msg.luz !== undefined) patch.light = parseFloat(msg.luz);
+
       if (Object.keys(patch).length > 0) {
         setPivotData((p) =>
           p ? { ...p, sensors: { ...p.sensors, ...patch } } : p,
@@ -334,7 +342,6 @@ const App = () => {
       if (!p) return p;
       const keys = Object.keys(p.sectors);
       if (keys.length >= MAX_SECTORS) return p;
-      // Próximo índice livre (1..4)
       let idx = 1;
       while (p.sectors[`sector_${idx}`]) idx += 1;
       const crop = cropById("milho");
@@ -457,6 +464,9 @@ const App = () => {
       />
     );
   } else {
+    // ── Tela Home ──
+    const sensors = pivotData.sensors ?? {};
+
     screen = (
       <View style={[st.root, { paddingTop: insets.top }]}>
         <ScrollView contentContainerStyle={st.content}>
@@ -578,44 +588,62 @@ const App = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Métricas */}
-          <View style={st.metricsRow}>
-            <MetricCard
-              icon="thermometer"
-              accent={theme.accentOrange}
-              value={
-                pivotData.sensors?.temperature !== undefined
-                  ? `${pivotData.sensors.temperature}°C`
-                  : "--°C"
-              }
-              label={t(lang, "temperature")}
-              onClick={() => openGraph("temperature")}
-              theme={theme}
-            />
-            <MetricCard
-              icon="water"
-              accent={theme.accentBlue}
-              value={
-                pivotData.sensors?.soil_humidity !== undefined
-                  ? `${pivotData.sensors.soil_humidity}%`
-                  : "--%"
-              }
-              label={t(lang, "soil_humidity")}
-              onClick={() => openGraph("soil_humidity")}
-              theme={theme}
-            />
-            <MetricCard
-              icon="cloud"
-              accent={theme.accentPurple}
-              value={
-                pivotData.sensors?.air_humidity !== undefined
-                  ? `${pivotData.sensors.air_humidity}%`
-                  : "--%"
-              }
-              label={t(lang, "air_humidity")}
-              onClick={() => openGraph("air_humidity")}
-              theme={theme}
-            />
+          {/* ── Métricas 2x2 ── */}
+          <View style={st.metricsGrid}>
+            {/* Linha 1 */}
+            <View style={st.metricsRow}>
+              <MetricCard
+                icon="thermometer"
+                accent={theme.accentOrange}
+                value={
+                  sensors.temperature !== undefined
+                    ? `${sensors.temperature}°C`
+                    : "--°C"
+                }
+                label={t(lang, "temperature")}
+                onClick={() => openGraph("temperature")}
+                theme={theme}
+              />
+              <MetricCard
+                icon="water"
+                accent={theme.accentBlue}
+                value={
+                  sensors.soil_humidity !== undefined
+                    ? `${sensors.soil_humidity}%`
+                    : "--%"
+                }
+                label={t(lang, "soil_humidity")}
+                onClick={() => openGraph("soil_humidity")}
+                theme={theme}
+              />
+            </View>
+            {/* Linha 2 */}
+            <View style={st.metricsRow}>
+              <MetricCard
+                icon="cloud"
+                accent={theme.accentPurple}
+                value={
+                  sensors.air_humidity !== undefined
+                    ? `${sensors.air_humidity}%`
+                    : "--%"
+                }
+                label={t(lang, "air_humidity")}
+                onClick={() => openGraph("air_humidity")}
+                theme={theme}
+              />
+              <MetricCard
+                icon="water-outline"
+                accent={theme.accentBlue}
+                value={
+                  sensors.water_flow_sensor !== undefined
+                    ? `${sensors.water_flow_sensor.toFixed(1)} L/min`
+                    : "-- L/min"
+                }
+                label={t(lang, "water_flow")}
+                onClick={() => openGraph("water_flow_sensor")}
+                theme={theme}
+              />
+            </View>
           </View>
 
           {/* Setores */}
@@ -714,7 +742,14 @@ const buildDefaultData = () => ({
       color: "#34D399",
     },
   },
-  sensors: { temperature: 30, soil_humidity: 68, air_humidity: 55 },
+  sensors: {
+    temperature: 30,
+    soil_humidity: 68,
+    air_humidity: 55,
+    water_flow_sensor: 0,
+    rain: 0,
+    light: 0,
+  },
 });
 
 const styles = (theme) =>
@@ -820,10 +855,13 @@ const styles = (theme) =>
     rotateBtnDisabled: { opacity: 0.4 },
     rotateBtnText: { fontSize: 16, fontWeight: "bold" },
 
+    // ── Grid 2x2 de métricas ──
+    metricsGrid: {
+      marginBottom: 14,
+      gap: 10,
+    },
     metricsRow: {
       flexDirection: "row",
-      justifyContent: "space-between",
-      marginBottom: 14,
       gap: 10,
     },
 

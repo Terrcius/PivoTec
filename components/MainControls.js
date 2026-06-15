@@ -259,7 +259,7 @@ const MainControls = ({
 
       {/* ── Sliders ── */}
       <SliderRow
-        label={t(lang, "water_flow")}
+        label={t(lang, "water_flow_slider")}
         value={localFlow}
         tintColor={theme.accentBlue}
         disabled={!isConnected}
