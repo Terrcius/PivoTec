@@ -1,0 +1,6 @@
+# ── Dependências do servidor de detecção de pragas (roda no PC) ──
+ultralytics          # YOLOv8 — treino e inferência
+fastapi              # servidor da API que o app consome
+uvicorn[standard]    # executa o FastAPI (servidor ASGI)
+python-multipart     # OBRIGATÓRIO: permite o FastAPI receber upload de imagem
+pillow               # abre/processa a imagem recebida do app

@@ -11,6 +11,7 @@ const BottomNav = ({ active, onChange, theme, lang }) => {
     { key: "home", labelKey: "nav_home", icon: "home" },
     { key: "config", labelKey: "nav_config", icon: "settings" },
     { key: "schedule", labelKey: "nav_schedule", icon: "calendar" },
+    { key: "pragas", labelKey: "nav_pests", icon: "bug" },
     { key: "dados", labelKey: "nav_data", icon: "stats-chart" },
     { key: "perfil", labelKey: "nav_profile", icon: "person" },
   ];

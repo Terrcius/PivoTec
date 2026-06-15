@@ -45,3 +45,23 @@ GoogleService-Info.plist
 
 # prints / análises internas
 AnaliseIA/
+
+# ─── Backend de IA (Python / YOLOv8) ─────────────────────────────
+# Cache do Python
+__pycache__/
+*.py[cod]
+# Datasets de imagens (reproduzíveis via download_*.py — pesados)
+backend/dataset_cls/
+backend/dataset/
+# Resultados de treino (modelos + gráficos — pesados)
+backend/runs/
+# Pesos de modelos (.pt: base e treinados)
+*.pt
+# Ambientes virtuais Python
+.venv/
+venv/
+env/
+
+# Windows
+Thumbs.db
+ehthumbs.db

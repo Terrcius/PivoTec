@@ -23,6 +23,7 @@ import SchedulePage from "./components/SchedulePage";
 import ProfilePage from "./components/ProfilePage";
 import BottomNav from "./components/BottomNav";
 import SectorManager from "./components/SectorManager";
+import PestDetector from "./components/PestDetector";
 
 import { configureAWS } from "./services/awsConfig";
 import { iotService } from "./services/iotService";
@@ -430,6 +431,14 @@ const App = () => {
     );
   } else if (view === "schedule") {
     screen = <SchedulePage theme={theme} lang={lang} />;
+  } else if (view === "pragas") {
+    screen = (
+      <View
+        style={{ flex: 1, backgroundColor: theme.bg, paddingTop: insets.top }}
+      >
+        <PestDetector theme={theme} lang={lang} />
+      </View>
+    );
   } else if (view === "dados") {
     screen = (
       <DetailedGraphsPage initialType={graphType} theme={theme} lang={lang} />

@@ -4,6 +4,7 @@ export const translations = {
     nav_home: "Início",
     nav_config: "Configurar",
     nav_schedule: "Agendar",
+    nav_pests: "Pragas",
     nav_data: "Dados",
     nav_profile: "Perfil",
 
@@ -133,6 +134,18 @@ export const translations = {
     language: "Idioma",
     lang_pt: "Português",
     lang_en: "English",
+
+    // Detector de Pragas
+    pest_title: "Detector de Pragas",
+    pest_hint: "Tire uma foto da folha/inseto para analisar",
+    pest_take_photo: "Tirar Foto",
+    pest_pick_gallery: "Galeria",
+    pest_detect: "Detectar Pragas",
+    pest_result: "Resultado",
+    pest_none: "Nenhuma praga detectada",
+    pest_no_camera: "Permissão de câmera negada",
+    pest_no_gallery: "Permissão da galeria negada",
+    pest_error: "Erro ao analisar a imagem",
   },
 
   en: {
@@ -140,6 +153,7 @@ export const translations = {
     nav_home: "Home",
     nav_config: "Configure",
     nav_schedule: "Schedule",
+    nav_pests: "Pests",
     nav_data: "Data",
     nav_profile: "Profile",
 
@@ -268,6 +282,18 @@ export const translations = {
     language: "Language",
     lang_pt: "Português",
     lang_en: "English",
+
+    // Pest Detector
+    pest_title: "Pest Detector",
+    pest_hint: "Take a photo of the leaf/insect to analyze",
+    pest_take_photo: "Take Photo",
+    pest_pick_gallery: "Gallery",
+    pest_detect: "Detect Pests",
+    pest_result: "Result",
+    pest_none: "No pests detected",
+    pest_no_camera: "Camera permission denied",
+    pest_no_gallery: "Gallery permission denied",
+    pest_error: "Error analyzing the image",
   },
 };
 

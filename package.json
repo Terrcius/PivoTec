@@ -8,6 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "dependency": "npm install && python -m pip install -r backend/requirements.txt",
     "test": "jest",
     "lint:check": "prettier --check .",
     "lint:fix": "prettier --write ."
@@ -24,6 +25,7 @@
     "@react-native-community/slider": "5.0.1",
     "aws-amplify": "^6.17.0",
     "expo": "54.0.33",
+    "expo-image-picker": "~17.0.11",
     "expo-status-bar": "3.0.9",
     "firebase": "^12.3.0",
     "js-sha256": "^0.11.1",
