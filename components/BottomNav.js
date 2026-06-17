@@ -17,7 +17,9 @@ const BottomNav = ({ active, onChange, theme, lang }) => {
   ];
 
   return (
-    <View style={[styles(theme).bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View
+      style={[styles(theme).bar, { paddingBottom: Math.max(insets.bottom, 8) }]}
+    >
       {TABS.map((tab) => {
         const isActive = active === tab.key;
         return (
@@ -27,14 +29,20 @@ const BottomNav = ({ active, onChange, theme, lang }) => {
             onPress={() => onChange(tab.key)}
             activeOpacity={0.7}
           >
-            <View style={[styles(theme).iconWrap, isActive && styles(theme).iconWrapActive]}>
+            <View style={styles(theme).iconWrap}>
               <Ionicons
                 name={isActive ? tab.icon : `${tab.icon}-outline`}
                 size={22}
                 color={isActive ? theme.primary : theme.textMuted}
+                style={isActive ? styles(theme).iconGlow : null}
               />
             </View>
-            <Text style={[styles(theme).label, isActive && styles(theme).labelActive]}>
+            <Text
+              style={[
+                styles(theme).label,
+                isActive && styles(theme).labelActive,
+              ]}
+            >
               {t(lang, tab.labelKey)}
             </Text>
           </TouchableOpacity>
@@ -62,7 +70,13 @@ const styles = (theme) =>
       alignItems: "center",
       justifyContent: "center",
     },
-    iconWrapActive: { backgroundColor: theme.primarySoft },
+    // Brilho ("aceso"): sombra da cor primária ao redor do ícone ativo.
+    // Ionicons é renderizado como glyph de texto, então textShadow funciona.
+    iconGlow: {
+      textShadowColor: theme.primary,
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 5,
+    },
     label: { fontSize: 10, fontWeight: "600", color: theme.textMuted },
     labelActive: { color: theme.primary },
   });
