@@ -17,7 +17,7 @@ import { t } from "../i18n";
 // Troque pelo Endereço IPv4 do seu PC (veja com "ipconfig").
 // PC e celular precisam estar no MESMO Wi-Fi.
 // localhost NÃO funciona aqui: o celular não enxerga o localhost do PC.
-const API_URL = "http://192.168.0.9:8000/detectar";
+const API_URL = "http://192.168.15.27:8000/detectar";
 
 const PestDetector = ({ theme, lang }) => {
   const s = styles(theme);

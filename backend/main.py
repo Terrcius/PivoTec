@@ -23,7 +23,7 @@ from ultralytics import YOLO
 # Aponte para o best.pt gerado pelo train.py (classificacao).
 # Enquanto nao treinar, use "yolov8n-cls.pt" para testar o fluxo
 # (ele classifica nas 1000 classes do ImageNet, nao nas pragas).
-MODELO_PATH = "runs/classify/train-4/weights/best.pt"
+MODELO_PATH = "runs/classify/train-6/weights/best.pt"
 # MODELO_PATH = "yolov8n-cls.pt"  # modelo generico (so para testar o fluxo)
 
 modelo = YOLO(MODELO_PATH)
