@@ -53,6 +53,9 @@ __pycache__/
 # Datasets de imagens (reproduzíveis via download_*.py — pesados)
 backend/dataset_cls/
 backend/dataset/
+backend/dataset_local/
+# Fotos de treino soltas (movidas para o HD externo)
+backend/*.jpeg
 # Resultados de treino (modelos + gráficos — pesados)
 backend/runs/
 # Pesos de modelos (.pt: base e treinados)
