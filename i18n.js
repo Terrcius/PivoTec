@@ -137,6 +137,10 @@ export const translations = {
     light: "Luminosidade",
     light_unit: "%",
     rain_note: "≥50% pausa a irrigação",
+    rain_alert_title: "Chuva detectada",
+    rain_alert_msg: "Deseja parar a irrigação?",
+    rain_alert_stop: "Parar irrigação",
+    rain_alert_dismiss: "Cancelar",
     light_note: "<30% liga o LED",
 
     // ProfilePage
@@ -315,6 +319,10 @@ export const translations = {
     light: "Light",
     light_unit: "%",
     rain_note: "≥50% pauses irrigation",
+    rain_alert_title: "Rain detected",
+    rain_alert_msg: "Do you want to stop irrigation?",
+    rain_alert_stop: "Stop irrigation",
+    rain_alert_dismiss: "Cancel",
     light_note: "<30% turns LED on",
 
     // ProfilePage
