@@ -229,14 +229,21 @@ export const dynamoDBService = {
   saveSensorReading: async (pivotId = "pivot_001", sensors) => {
     try {
       const now = Date.now();
+      // Só campos numéricos finitos: um NaN/null faria o DynamoDB rejeitar
+      // o PutItem INTEIRO (nada seria salvo). Aqui ele é ignorado.
+      const numericFields = Object.fromEntries(
+        Object.entries(sensors)
+          .map(([k, v]) => [k, Number(v)])
+          .filter(([, v]) => Number.isFinite(v))
+          .map(([k, v]) => [k, { N: v.toString() }]),
+      );
+      if (Object.keys(numericFields).length === 0) return; // nada válido p/ salvar
       await dynamoRequest("PutItem", {
         TableName: TABLES.SENSOR_HISTORY,
         Item: {
           pivotId: { S: pivotId },
           timestamp: { N: now.toString() },
-          ...Object.fromEntries(
-            Object.entries(sensors).map(([k, v]) => [k, { N: v.toString() }]),
-          ),
+          ...numericFields,
           ttl: { N: (Math.floor(now / 1000) + 30 * 24 * 60 * 60).toString() },
         },
       });
@@ -258,12 +265,17 @@ export const dynamoDBService = {
         },
         ScanIndexForward: true,
       });
-      return (result.Items || []).map((item) => ({
-        timestamp: parseFloat(item.timestamp?.N || 0),
-        temperature: parseFloat(item.temperature?.N || 0),
-        soil_humidity: parseFloat(item.soil_humidity?.N || 0),
-        air_humidity: parseFloat(item.air_humidity?.N || 0),
-      }));
+      // Lê TODOS os campos do item dinamicamente (inclui os sensores novos:
+      // water_flow_sensor, rain, light) — antes só 3 eram mapeados e o resto
+      // vinha como 0 no gráfico.
+      return (result.Items || []).map((item) => {
+        const row = {};
+        for (const [k, v] of Object.entries(item)) {
+          if (v.N !== undefined) row[k] = parseFloat(v.N);
+          else if (v.S !== undefined) row[k] = v.S;
+        }
+        return row;
+      });
     } catch (e) {
       console.error("[DynamoDB] getSensorHistory:", e);
       return [];
